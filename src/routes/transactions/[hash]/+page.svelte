@@ -14,15 +14,27 @@
 	import SqlButton from '$lib/ui/SqlButton.svelte';
 	import { live } from '$lib/lake/lake.svelte';
 	import { hashParam } from '$lib/lake/links';
+	import { txDay } from '$lib/lake/replay';
 	import { int, utc } from '$lib/cardano';
 	import { ada, shorten } from '$lib/format';
 
 	const txHash = $derived((page.params.hash ?? '').split('?')[0].toLowerCase());
-	const date = $derived.by(() => {
+	const given = $derived.by(() => {
 		page.url.hash;
 		const d = hashParam('date');
 		return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
 	});
+	// Without ?date=, the tx index finds the day.
+	let found = $state<{ hash: string; date: string | null } | null>(null);
+	$effect(() => {
+		const h = txHash;
+		if (given || !/^[0-9a-f]{64}$/.test(h) || found?.hash === h) return;
+		txDay(h)
+			.then((d) => (found = { hash: h, date: d }))
+			.catch(() => (found = { hash: h, date: null }));
+	});
+	const date = $derived(given ?? (found?.hash === txHash ? found.date : null));
+	const lookingUp = $derived(!given && found?.hash !== txHash);
 	let pickDate = $state('');
 
 	interface Ref {
@@ -125,11 +137,13 @@ FROM transaction_scripts WHERE date = DATE '${d}' AND tx_hash = '${h}' ORDER BY 
 	<Hash value={txHash} full />
 </PageHeader>
 
-{#if !date}
+{#if !date && lookingUp}
+	<div class="y-panel"><Skeleton rows={4} /></div>
+{:else if !date}
 	<div class="y-panel p-6 text-sm">
 		<p class="text-muted">
-			The lake is partitioned by day, so a transaction opens from its day. Open it from its block, or enter the UTC date it was included on.
-			Search by hash alone needs the transaction index, which is planned.
+			This transaction isn't in the transaction index of the published data (it may be newer than the snapshot). If you know the UTC date it was
+			included on, enter it:
 		</p>
 		<form class="mt-4 flex gap-2" onsubmit={(e) => (e.preventDefault(), pickDate && goto(`#/transactions/${txHash}?date=${pickDate}`))}>
 			<input class="y-input h-9 w-48" type="date" bind:value={pickDate} />
@@ -219,7 +233,8 @@ FROM transaction_scripts WHERE date = DATE '${d}' AND tx_hash = '${h}' ORDER BY 
 									<span class="font-mono text-xs">{shorten(s.script_hash, 10, 8)}</span>
 									<span class="text-xs text-muted">{PLUTUS[s.script_type] ?? `type ${s.script_type}`}</span>
 									<span class="ml-auto text-xs tabular-nums text-muted">{int(s.unit_steps)} steps · {int(s.unit_mem)} mem</span>
-									<a class="y-btn h-8 text-xs" href="#/lab?script={s.script_hash}&tx={txHash}&date={date}&purpose={s.purpose.toLowerCase()}&index={s.redeemer_index}" title="Debug this script execution with the julc engine"><Bug class="h-3.5 w-3.5" />Debug</a>
+									<a class="y-btn h-8 text-xs" href="#/lab?script={s.script_hash}" title="Open the script in the validator lab">Lab</a>
+									<a class="y-btn y-btn-primary h-8 text-xs" href="#/transactions/{txHash}/debug/{s.purpose.toLowerCase()}/{s.redeemer_index}?date={date}" title="Re-run this script with the transaction's real inputs in the julc debugger"><Bug class="h-3.5 w-3.5" />Debug</a>
 								</li>
 							{/each}
 						</ul>

@@ -6,7 +6,7 @@
 
 	/*
 	 * Lookup box: block number, epoch ("e600" or a small number), pool id (pool1… or hex), DRep id.
-	 * Transaction hashes need the tx index (planned), so they are explained rather than guessed.
+	 * Transaction hashes open the transaction page, which finds the day through the tx index.
 	 */
 	let q = $state('');
 	let input: HTMLInputElement;
@@ -24,10 +24,7 @@
 		if (s.startsWith('pool1') && bech32Decode(s)) return nav(`/pools/${s}`);
 		if (/^[0-9a-f]{56}$/i.test(s)) return nav(`/pools/${s.toLowerCase()}`);
 		if (s.startsWith('drep1')) return nav(`/governance/dreps?q=${encodeURIComponent(s)}`);
-		if (/^[0-9a-f]{64}$/i.test(s)) {
-			toasts.show('Transaction search by hash is coming with the transaction index. Open transactions from a block for now.', 'info', 5000);
-			return;
-		}
+		if (/^[0-9a-f]{64}$/i.test(s)) return nav(`/transactions/${s.toLowerCase()}`);
 		toasts.show('Try a block number, an epoch (e600), or a pool id.', 'info', 4000);
 	}
 
@@ -44,7 +41,7 @@
 		bind:this={input}
 		bind:value={q}
 		class="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-faint"
-		placeholder="Block number, epoch (e600), pool id…"
+		placeholder="Tx hash, block number, epoch (e600), pool id…"
 		aria-label="Search"
 	/>
 </form>

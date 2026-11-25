@@ -8,10 +8,15 @@
  *   /genesis                        mainnet slot configuration (constants)
  *   /blocks/latest                  summary pack
  *   /scripts/{hash}[/cbor]          summary script_index -> one script partition
- *   /utxos/{tx}/{i}, /scripts/datum/{hash}/cbor, /txs/...   need a transaction / datum index (planned): null
+ *   /scripts/datum/{hash}/cbor      datums found while loading a transaction (lake/replay.ts)
+ *   /governance/votes/txs/{tx}, /governance/proposals/{tx}, /blockfrost/txs/{tx}/stakes|delegations
+ *                                   the transaction's day from the tx index, then one partition
+ *   /txs/{tx}/cbor/hex              not in the lake (the replay rebuilds from JSON instead): null
  */
 import { live, summary } from '$lib/lake/lake.svelte';
 import type { LatestBlock } from '$lib/lake/types';
+import { datumCache, txDay, txDays } from '$lib/lake/replay';
+import { poolBech32 } from '$lib/cardano';
 
 export class ApiError extends Error {
 	constructor(
@@ -78,6 +83,37 @@ async function resolve(path: string): Promise<unknown> {
 			return { cbor: env.content ?? null };
 		} catch {
 			return { cbor: row.content };
+		}
+	}
+
+	// Datums found while loading a transaction for replay (lake/replay.ts fills the cache).
+	if ((m = p.match(/^\/scripts\/datum\/([0-9a-f]{64})\/cbor$/))) {
+		const c = datumCache.get(m[1]);
+		return c ? { cbor: c } : null;
+	}
+
+	// Transaction parts the replay asks for only when a script runs for them: one partition each, on the
+	// transaction's day (known from the tx index once the transaction was loaded).
+	if ((m = p.match(/^\/(governance\/votes\/txs|blockfrost\/txs|governance\/proposals)\/([0-9a-f]{64})(\/stakes|\/delegations)?$/))) {
+		const h = m[2];
+		const d = txDays.get(h) ?? (await txDay(h));
+		if (!d) return null;
+		const where = `date = DATE '${d}' AND tx_hash = '${h}'`;
+		if (m[1] === 'governance/votes/txs')
+			return live(`SELECT voter_type, voter_hash, gov_action_tx_hash, gov_action_index, vote FROM voting_procedure WHERE ${where} ORDER BY idx`);
+		if (m[1] === 'governance/proposals') {
+			const rows = await live<{ idx: number; type: string; deposit: number; return_address: string; details: string | null }>(
+				`SELECT idx, type, deposit, return_address, details FROM gov_action_proposal WHERE ${where} ORDER BY idx`
+			);
+			return rows.map((r) => ({ index: r.idx, type: r.type, deposit: r.deposit, return_address: r.return_address, details: r.details ? JSON.parse(r.details) : null }));
+		}
+		if (m[3] === '/stakes') {
+			const rows = await live<{ cert_index: number; type: string; address: string }>(`SELECT cert_index, type, address FROM stake_registration WHERE ${where} ORDER BY cert_index`);
+			return rows.map((r) => ({ cert_index: r.cert_index, address: r.address, registration: r.type === 'STAKE_REGISTRATION' }));
+		}
+		if (m[3] === '/delegations') {
+			const rows = await live<{ cert_index: number; address: string; pool_id: string }>(`SELECT cert_index, address, pool_id FROM delegation WHERE ${where} ORDER BY cert_index`);
+			return rows.map((r) => ({ cert_index: r.cert_index, address: r.address, pool_id: poolBech32(r.pool_id) }));
 		}
 	}
 
