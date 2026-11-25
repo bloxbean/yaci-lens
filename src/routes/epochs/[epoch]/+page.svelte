@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PoolName from '$lib/names/PoolName.svelte';
 	import Timer from '@lucide/svelte/icons/timer';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -95,7 +96,7 @@ LIMIT 50`;
 	{:then pools}
 		<DataTable rows={pools} {columns} key={(p) => p.pool_hash} rowHref={(p) => `#/pools/${poolBech32(p.pool_hash)}`} dense emptyTitle="No blocks in this epoch">
 			{#snippet cell(p, k)}
-				{#if k === 'pool'}<a class="y-link font-mono text-xs" href="#/pools/{poolBech32(p.pool_hash)}">{shorten(poolBech32(p.pool_hash), 14, 8)}</a>
+				{#if k === 'pool'}<PoolName hash={p.pool_hash} head={14} tail={8} />
 				{:else if k === 'blocks'}<span class="tabular-nums font-semibold">{int(p.blocks)}</span>
 				{:else if k === 'txs'}<span class="tabular-nums">{int(p.txs)}</span>
 				{:else if k === 'stake'}<span class="tabular-nums">{adaShort(p.stake_ada)}</span>

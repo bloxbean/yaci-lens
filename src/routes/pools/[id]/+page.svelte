@@ -14,6 +14,10 @@
 	import type { Pool } from '$lib/lake/types';
 	import { adaShort, int, poolBech32, poolHash, short } from '$lib/cardano';
 	import { shorten } from '$lib/format';
+	import ShieldCheck from '@lucide/svelte/icons/shield-check';
+	import ShieldAlert from '@lucide/svelte/icons/shield-alert';
+	import ExternalLink from '@lucide/svelte/icons/external-link';
+	import { poolMeta, poolLabel } from '$lib/lake/offchain';
 
 	const id = $derived(page.params.id ?? '');
 	const hash = $derived(poolHash(id));
@@ -46,6 +50,7 @@ GROUP BY 1 ORDER BY 1`;
 		const h = hash;
 		const e = lake.tip?.epoch;
 		return {
+			meta: poolMeta().then((m) => (h ? (m.get(h) ?? null) : null)),
 			pool: summary<Pool>('pools').then((ps) => ps.find((p) => p.pool_hash === h) ?? null),
 			delegators: h && e ? live<Delegator>(delegSql(h, e)) : null,
 			rewards: h && e ? live<RewardRow>(rewardSql(h, e)) : null
@@ -61,10 +66,16 @@ GROUP BY 1 ORDER BY 1`;
 
 <svelte:head><title>Pool {shorten(id, 10, 6)} · Yaci Lens</title></svelte:head>
 
-<PageHeader kind="Stake pool" title={shorten(poolBech32(hash ?? id), 14, 8)}>
-	{#snippet icon()}<Server class="h-5 w-5" />{/snippet}
-	{#if hash}<Hash value={poolBech32(hash)} full />{/if}
-</PageHeader>
+{#await data.meta then m}
+	<PageHeader kind="Stake pool" title={poolLabel(m) ?? shorten(poolBech32(hash ?? id), 14, 8)}>
+		{#snippet icon()}<Server class="h-5 w-5" />{/snippet}
+		{#if hash}<Hash value={poolBech32(hash)} full />{/if}
+		{#if m?.description && m.hash_ok !== false}<p class="mt-2 max-w-3xl text-sm text-muted">{m.description}</p>{/if}
+		{#snippet actions()}
+			{#if m?.homepage && m.hash_ok !== false}<a class="y-btn h-9" href={m.homepage} target="_blank" rel="noopener noreferrer nofollow"><ExternalLink class="h-4 w-4" />Website</a>{/if}
+		{/snippet}
+	</PageHeader>
+{/await}
 
 {#if !hash}
 	<div class="y-panel p-6 text-sm text-muted">"{id}" is not a pool id (pool1… or a 56-character hex hash).</div>
@@ -82,7 +93,14 @@ GROUP BY 1 ORDER BY 1`;
 			<Panel title="Registration" class="mb-6">
 				<dl class="grid gap-x-10 gap-y-4 md:grid-cols-2">
 					<KV label="Pool hash"><Hash value={p.pool_hash} /></KV>
-					<KV label="Metadata">{#if p.metadata_url}<a class="y-link break-all" href={p.metadata_url} target="_blank" rel="noopener noreferrer">{p.metadata_url}</a>{:else}—{/if}</KV>
+					<KV label="Metadata">
+						{#if p.metadata_url}<a class="y-link break-all" href={p.metadata_url} target="_blank" rel="noopener noreferrer nofollow">{p.metadata_url}</a>{:else}—{/if}
+						{#await data.meta then m}
+							{#if m?.fetched && m.hash_ok}<span class="mt-1 flex items-center gap-1 text-xs text-mint"><ShieldCheck class="h-3.5 w-3.5" />Hash matches the chain</span>
+							{:else if m?.fetched && m.hash_ok === false}<span class="mt-1 flex items-center gap-1 text-xs text-danger"><ShieldAlert class="h-3.5 w-3.5" />The file changed since it was registered (hash mismatch); its fields are not shown</span>
+							{:else if m && !m.fetched}<span class="mt-1 block text-xs text-faint">Couldn't read the metadata file ({m.error ?? 'unknown error'}).</span>{/if}
+						{/await}
+					</KV>
 					<KV label="Reward account"><span class="font-mono text-xs break-all">{p.reward_account ?? '—'}</span></KV>
 				</dl>
 			</Panel>

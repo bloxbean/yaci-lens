@@ -8,6 +8,7 @@ import Users from '@lucide/svelte/icons/users';
 import TerminalSquare from '@lucide/svelte/icons/square-terminal';
 import Table2 from '@lucide/svelte/icons/table-2';
 import Info from '@lucide/svelte/icons/info';
+import Layers from '@lucide/svelte/icons/layers';
 import FlaskConical from '@lucide/svelte/icons/flask-conical';
 
 export interface NavItem {
@@ -32,7 +33,8 @@ export const NAV: NavGroup[] = [
 			{ label: 'Dashboard', href: '/', icon: LayoutDashboard, keywords: 'home overview' },
 			{ label: 'Epochs', href: '/epochs', icon: Timer, keywords: 'ada pots treasury stake' },
 			{ label: 'Blocks', href: '/blocks', icon: Blocks, match: ['/transactions'], keywords: 'block transactions' },
-			{ label: 'Pools', href: '/pools', icon: Server, keywords: 'stake pool spo' }
+			{ label: 'Pools', href: '/pools', icon: Server, keywords: 'stake pool spo' },
+			{ label: 'Staking', href: '/staking', icon: Layers, keywords: 'delegation certificates rewards withdrawals nakamoto' }
 		]
 	},
 	{

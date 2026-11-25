@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PoolName from '$lib/names/PoolName.svelte';
 	import Box from '@lucide/svelte/icons/box';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -100,7 +101,7 @@ ORDER BY t.tx_index`;
 				<KV label="Hash"><Hash value={b.hash} /></KV>
 				<KV label="Time">{utc(b.block_time)}</KV>
 				<KV label="Epoch / slot"><a class="y-link" href="#/epochs/{b.epoch}">{b.epoch}</a> / {int(b.epoch_slot)} · slot {int(b.slot)}</KV>
-				<KV label="Pool"><a class="y-link font-mono text-xs" href="#/pools/{poolBech32(b.slot_leader)}">{poolBech32(b.slot_leader)}</a></KV>
+				<KV label="Pool"><PoolName hash={b.slot_leader} head={16} tail={8} /></KV>
 				<KV label="Transactions">{b.no_of_txs}</KV>
 				<KV label="Fees">₳{ada(b.total_fees)}</KV>
 				<KV label="Size">{int(b.body_size)} bytes</KV>

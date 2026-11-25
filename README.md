@@ -25,11 +25,19 @@ Yaci Store (mainnet) ──analytics export──► Parquet + DuckLake catalog 
 Browser: Yaci Lens (static) ── DuckDB-WASM ── ATTACH catalog.ducklake ── HTTP range reads of only the needed files
 ```
 
-- **Explorer pages** (dashboard, epochs, blocks, transactions, pools, governance, DReps) read the summary pack for
+- **Explorer pages** (dashboard, epochs, blocks, transactions, pools, staking, governance, DReps) read the summary pack for
   history-wide views (one request each) and run live lake queries that touch a few partitions (a block, a day, an
   epoch). Every live panel has an **SQL** button that opens its query in the SQL lab.
 - **SQL lab**: any SQL over the whole lake (47 tables, ~150 GB) in DuckDB-WASM, with schema completion, examples,
   CSV export, share links and a quick chart. It warns when a query on a big table has no `date`/`epoch` filter.
+- **Transactions by hash** and **script debugging of real transactions**: the published tx index maps a hash to
+  its day; Lens resolves the inputs and reference inputs from the days they were created and re-runs each script in
+  the julc debugger with the transaction's real context (`#/transactions/<hash>/debug/<purpose>/<index>`).
+- **Names and metadata**: pool tickers/names (CIP-6), DRep profiles (CIP-119) and proposal texts (CIP-108) are
+  fetched and hash-checked by the publish job (most metadata hosts send no CORS headers) and published in the
+  summary pack; DRep/proposal pages also load the full document in the browser when the host allows it, and token
+  names come from the CIP-26 registry. Browser fetches are cached in localStorage (a day; failures an hour; tokens a
+  week).
 - **Validator lab** (julc): write a validator in Java, or load any on-chain script by hash, evaluate it against a
   transaction you describe, and step-debug it at the UPLC level, all in the browser
   ([`@julclang/julc-wasm`](https://www.npmjs.com/package/@julclang/julc-wasm) 0.1.0-pre22).
@@ -101,9 +109,6 @@ The UI, julc integration and replay pipeline are forked from
 
 ## Roadmap
 
-- **Transaction index** (tx hash → day) in the published data: search by transaction hash, input values, and
-  replaying a historical transaction's scripts in the julc debugger with its real context (the viewer's replay
-  pipeline is already here; it needs resolved inputs).
 - Preprod and preview networks.
 - A Claude skill and a serverless MCP over the same data.
 

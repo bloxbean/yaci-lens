@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PoolName from '$lib/names/PoolName.svelte';
 	import Blocks from '@lucide/svelte/icons/blocks';
 	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/ui/PageHeader.svelte';
@@ -50,7 +51,7 @@
 				{#if k === 'number'}<a class="y-link font-mono font-semibold" href="#/blocks/{b.number}">#{int(b.number)}</a>
 				{:else if k === 'time'}<span class="tabular-nums text-muted">{utc(b.block_time)}</span>
 				{:else if k === 'epoch'}<span class="tabular-nums text-muted">{b.epoch} / {int(b.epoch_slot)}</span>
-				{:else if k === 'pool'}<a class="y-link font-mono text-xs" href="#/pools/{poolBech32(b.pool_hash)}">{shorten(poolBech32(b.pool_hash), 10, 6)}</a>
+				{:else if k === 'pool'}<PoolName hash={b.pool_hash} />
 				{:else if k === 'txs'}<span class="tabular-nums">{b.no_of_txs}</span>
 				{:else if k === 'size'}<span class="tabular-nums">{int(b.body_size)} B</span>
 				{:else if k === 'fees'}<span class="tabular-nums">₳{b.fees_ada.toFixed(2)}</span>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { names } from '$lib/names/names.svelte';
+	import { actionMeta } from '$lib/lake/offchain';
 	import ScrollText from '@lucide/svelte/icons/scroll-text';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import PageHeader from '$lib/ui/PageHeader.svelte';
@@ -51,7 +53,7 @@
 			<section class="y-panel overflow-hidden">
 				<button class="flex w-full flex-wrap items-center gap-3 px-5 py-4 text-left" onclick={() => (open = open === key ? null : key)}>
 					<Badge tone={proposalTone(p.status)}>{p.status ?? '—'}</Badge>
-					<span class="font-display font-semibold">{typeLabel(p.type)}</span>
+					<span class="min-w-0 font-display font-semibold">{names.action(p.tx_hash, p.idx) ?? typeLabel(p.type)}</span>{#if names.action(p.tx_hash, p.idx)}<span class="text-xs text-muted">{typeLabel(p.type)}</span>{/if}
 					<span class="font-mono text-xs text-faint">{shorten(p.tx_hash, 8, 6)}#{p.idx}</span>
 					<span class="ml-auto flex items-center gap-4 text-xs text-muted">
 						{#each [['DReps', d], ['SPOs', s], ['CC', c]] as [label, v] (label)}
@@ -78,6 +80,14 @@
 							<div><dt class="y-label">Transaction</dt><dd class="font-mono text-xs break-all">{p.tx_hash}#{p.idx}</dd></div>
 						</dl>
 						<div class="flex min-w-0 flex-col gap-3">
+							{#await actionMeta() then am}
+								{@const m = am.get(`${p.tx_hash}#${p.idx}`)}
+								{#if m?.fetched && m.hash_ok !== false}
+									{#each [['Abstract', m.abstract], ['Motivation', m.motivation], ['Rationale', m.rationale]] as [label, text] (label)}
+										{#if text}<div><div class="y-label mb-1">{label}</div><p class="max-h-60 overflow-y-auto whitespace-pre-line text-sm leading-relaxed">{text}</p></div>{/if}
+									{/each}
+								{:else if m && m.hash_ok === false}<p class="text-xs text-danger">The anchored document changed since submission (hash mismatch).</p>{/if}
+							{/await}
 							{#if p.voting_stats}<JsonView value={p.voting_stats} label="Voting stats (stake-weighted)" maxHeight={220} />{/if}
 							{#if p.details}<JsonView value={p.details} label="Details" maxHeight={220} />{/if}
 						</div>

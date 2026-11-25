@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PoolName from '$lib/names/PoolName.svelte';
 	import Activity from '@lucide/svelte/icons/activity';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import Box from '@lucide/svelte/icons/box';
@@ -124,7 +125,7 @@
 							<span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-line bg-surface-2 text-faint"><Box class="h-4 w-4" /></span>
 							<div class="min-w-0 flex-1">
 								<div class="font-mono text-sm font-semibold tabular-nums">#{int(b.number)}</div>
-								<div class="truncate text-xs text-muted">{utc(b.block_time)} · pool <span class="font-mono">{shorten(poolBech32(b.pool_hash), 10, 6)}</span></div>
+								<div class="truncate text-xs text-muted">{utc(b.block_time)} · <PoolName hash={b.pool_hash} link={false} /></div>
 							</div>
 							<div class="text-right text-xs">
 								<div class="font-semibold tabular-nums">{b.no_of_txs} txs</div>
@@ -144,7 +145,7 @@
 					{#each pools.slice(0, 6) as p (p.pool_hash)}
 						<li>
 							<a href="#/pools/{poolBech32(p.pool_hash)}" class="flex items-center gap-3 px-5 py-2.5 text-sm transition hover:bg-surface-2/60">
-								<span class="min-w-0 flex-1 truncate font-mono text-xs">{shorten(poolBech32(p.pool_hash), 12, 8)}</span>
+								<span class="min-w-0 flex-1 truncate"><PoolName hash={p.pool_hash} link={false} head={12} tail={8} /></span>
 								<span class="tabular-nums text-muted">{(p.stake_share * 100).toFixed(2)}%</span>
 								<span class="w-20 text-right font-semibold tabular-nums">{adaShort(p.active_stake_ada)}</span>
 							</a>

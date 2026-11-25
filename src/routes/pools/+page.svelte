@@ -1,4 +1,6 @@
 <script lang="ts">
+	import PoolName from '$lib/names/PoolName.svelte';
+	import { names } from '$lib/names/names.svelte';
 	import Server from '@lucide/svelte/icons/server';
 	import PageHeader from '$lib/ui/PageHeader.svelte';
 	import Panel from '$lib/ui/Panel.svelte';
@@ -33,7 +35,7 @@
 
 <PageHeader kind="Staking" title="Stake pools">
 	{#snippet icon()}<Server class="h-5 w-5" />{/snippet}
-	{#snippet actions()}<input class="y-input h-9 w-64" placeholder="Filter by pool id or metadata URL" bind:value={filter} />{/snippet}
+	{#snippet actions()}<input class="y-input h-9 w-64" placeholder="Filter by ticker, name or pool id" bind:value={filter} />{/snippet}
 	Stake active in the current epoch (snapshot of two epochs earlier), with the latest registration parameters.
 </PageHeader>
 
@@ -43,12 +45,12 @@
 	{:then pools}
 		{@const ranked = pools.map((p, i) => ({ ...p, rank: i + 1, bech: poolBech32(p.pool_hash) }))}
 		{@const f = filter.trim().toLowerCase()}
-		{@const rows = f ? ranked.filter((p) => p.bech.includes(f) || p.pool_hash.includes(f) || (p.metadata_url ?? '').toLowerCase().includes(f)) : ranked}
+		{@const rows = f ? ranked.filter((p) => p.bech.includes(f) || p.pool_hash.includes(f) || (p.metadata_url ?? '').toLowerCase().includes(f) || (names.pool(p.pool_hash) ?? '').toLowerCase().includes(f)) : ranked}
 		<DataTable rows={rows.slice(0, limit)} {columns} key={(p) => p.pool_hash} rowHref={(p) => `#/pools/${p.bech}`} dense>
 			{#snippet cell(p, k)}
 				{#if k === 'rank'}<span class="text-faint tabular-nums">{p.rank}</span>
 				{:else if k === 'pool'}
-					<a class="y-link font-mono text-xs" href="#/pools/{p.bech}">{shorten(p.bech, 14, 8)}</a>
+					<PoolName hash={p.pool_hash} head={14} tail={8} />
 					{#if p.metadata_url}<div class="max-w-[260px] truncate text-[11px] text-faint">{p.metadata_url}</div>{/if}
 				{:else if k === 'stake'}<span class="font-semibold tabular-nums">{adaShort(p.active_stake_ada)}</span>
 				{:else if k === 'share'}<span class="tabular-nums">{(p.stake_share * 100).toFixed(3)}%</span>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { names } from '$lib/names/names.svelte';
 	import Users from '@lucide/svelte/icons/users';
 	import { onMount } from 'svelte';
 	import PageHeader from '$lib/ui/PageHeader.svelte';
@@ -35,7 +36,7 @@
 
 <PageHeader kind="Governance" title="DReps">
 	{#snippet icon()}<Users class="h-5 w-5" />{/snippet}
-	{#snippet actions()}<input class="y-input h-9 w-64" placeholder="Filter by DRep id" bind:value={filter} />{/snippet}
+	{#snippet actions()}<input class="y-input h-9 w-64" placeholder="Filter by name or DRep id" bind:value={filter} />{/snippet}
 	Voting power in the newest DRep distribution, including the predefined Abstain and No-confidence options.
 </PageHeader>
 
@@ -46,11 +47,11 @@
 		{@const total = dreps.reduce((s, d) => s + d.voting_power_ada, 0)}
 		{@const ranked = dreps.map((d, i) => ({ ...d, rank: i + 1, id: d.drep_id ?? d.drep_type }))}
 		{@const f = filter.trim().toLowerCase()}
-		{@const rows = f ? ranked.filter((d) => d.id.toLowerCase().includes(f) || d.drep_hash.includes(f)) : ranked}
+		{@const rows = f ? ranked.filter((d) => d.id.toLowerCase().includes(f) || d.drep_hash.includes(f) || (names.drep(d.drep_hash) ?? '').toLowerCase().includes(f)) : ranked}
 		<DataTable rows={rows.slice(0, limit)} {columns} key={(d) => d.drep_hash + d.drep_type} dense>
 			{#snippet cell(d, k)}
 				{#if k === 'rank'}<span class="text-faint tabular-nums">{d.rank}</span>
-				{:else if k === 'drep'}<span class="font-mono text-xs" title={d.id}>{d.drep_id ? shorten(d.drep_id, 14, 8) : d.drep_type}</span>
+				{:else if k === 'drep'}{#if d.drep_id}<a class="y-link {names.drep(d.drep_hash) ? '' : 'font-mono text-xs'}" href="#/governance/dreps/{d.drep_id}" title={d.id}>{names.drep(d.drep_hash) ?? shorten(d.drep_id, 14, 8)}</a>{:else}<span class="text-xs">{d.drep_type}</span>{/if}
 				{:else if k === 'type'}<span class="text-xs text-muted">{d.drep_type}</span>
 				{:else if k === 'status'}{#if d.status}<Badge tone={d.status === 'ACTIVE' || d.status === 'REGISTERED' ? 'ok' : 'neutral'}>{d.status}</Badge>{/if}
 				{:else if k === 'power'}<span class="font-semibold tabular-nums">{adaShort(d.voting_power_ada)}</span>

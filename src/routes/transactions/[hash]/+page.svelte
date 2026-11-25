@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TokenName from '$lib/names/TokenName.svelte';
 	import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
 	import Bug from '@lucide/svelte/icons/bug';
 	import { page } from '$app/state';
@@ -202,7 +203,7 @@ FROM transaction_scripts WHERE date = DATE '${d}' AND tx_hash = '${h}' ORDER BY 
 									</div>
 									{#if o.assets.length}
 										<div class="mt-1.5 flex flex-wrap gap-1">
-											{#each o.assets.slice(0, 6) as a (a.unit)}<Badge tone="neutral">{int(Number(a.quantity))} {shorten(a.unit.slice(56) || a.unit, 8, 4)}</Badge>{/each}
+											{#each o.assets.slice(0, 6) as a (a.unit)}<Badge tone="neutral"><TokenName unit={a.unit} quantity={a.quantity} /></Badge>{/each}
 											{#if o.assets.length > 6}<Badge tone="neutral">+{o.assets.length - 6}</Badge>{/if}
 										</div>
 									{/if}
