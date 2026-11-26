@@ -77,7 +77,13 @@ SELECT count(*) FROM cardano.block;</pre>
 				<li>Amounts in the lake are exact lovelace; the summary pack uses ADA as floating point for charts.</li>
 			</ul>
 		</Panel>
-		<Panel title="Self-hosting">
+		<Panel title="Make your own, or contribute">
+			<p class="mb-3 text-sm text-muted">
+				Yaci Lens is open source (MIT). <a class="y-link" href="https://github.com/bloxbean/yaci-lens" target="_blank" rel="noopener noreferrer">Fork it on GitHub</a>, add the pages
+				and dashboards your community needs, change the look, and host your own version on GitHub Pages: no servers, no API keys. Or
+				<a class="y-link" href="https://github.com/bloxbean/yaci-lens" target="_blank" rel="noopener noreferrer">contribute to Yaci Lens</a>: ideas, bug reports and pull requests
+				are welcome.
+			</p>
 			<p class="text-sm text-muted">
 				Publish your own Yaci Store export with <a class="y-link" href="https://github.com/bloxbean/yaci-lens-publisher" target="_blank" rel="noopener noreferrer">Yaci Lens Publisher</a> to any S3-compatible bucket with public reads and CORS, then build Yaci Lens with
 				<code>VITE_LENS_CATALOG_URL</code> and <code>VITE_LENS_SUMMARY_URL</code> pointing at it.

@@ -48,7 +48,7 @@
 				>Yaci Lens · data from <a class="y-link" href="https://github.com/bloxbean/yaci-store" target="_blank" rel="noopener noreferrer">Yaci Store</a>, queried in your
 				browser with <a class="y-link" href="https://duckdb.org/docs/api/wasm/overview" target="_blank" rel="noopener noreferrer">DuckDB-WASM</a></span
 			>
-			<span>Open source by <a class="y-link" href="https://github.com/bloxbean" target="_blank" rel="noopener noreferrer">BloxBean</a> · MIT</span>
+			<span>Open source by <a class="y-link" href="https://github.com/bloxbean" target="_blank" rel="noopener noreferrer">BloxBean</a> · MIT · <a class="y-link" href="https://github.com/bloxbean/yaci-lens" target="_blank" rel="noopener noreferrer">fork it or contribute</a></span>
 		</div>
 	</footer>
 </div>

@@ -18,6 +18,11 @@ DuckDB-WASM, and hosted on GitHub Pages.
 - Static website deployment.
 - Self-hostable using compatible object storage.
 
+**Open source (MIT): fork it and make your own Yaci Lens, or contribute to Yaci Lens.** Add the pages and
+dashboards your community needs, change the look, point it at your own data and host it on your own GitHub Pages,
+or send your improvements back so everyone gets them. See
+[Make your own Yaci Lens, or contribute](#make-your-own-yaci-lens-or-contribute).
+
 ## How it works
 
 ```
@@ -111,6 +116,23 @@ on any static host without rewrite rules.
 |---|---|
 | `VITE_LENS_CATALOG_URL` | `https://data.bloxbean.org/mainnet/v1/catalog.ducklake` |
 | `VITE_LENS_SUMMARY_URL` | `https://data.bloxbean.org/mainnet/v1/summary/` |
+
+## Make your own Yaci Lens, or contribute
+
+Yaci Lens is open source under the MIT license, and everything it needs is static, so your own version is a fork away:
+
+1. **Fork** this repository on GitHub.
+2. **Change what you like**: add pages under `src/routes/`, charts with the kit in `src/lib/charts/`, starter
+   dashboards in `src/lib/dashboards/templates.ts`, or your own branding in `src/lib/shell/`. Pages query the
+   published data with SQL (`summary()`, `summaryQuery()` and `live()` in `src/lib/lake/`).
+3. **Pick the data**: keep BloxBean's public mainnet data (the default), or publish your own Yaci Store export
+   with [Yaci Lens Publisher](https://github.com/bloxbean/yaci-lens-publisher) and set `VITE_LENS_CATALOG_URL` and
+   `VITE_LENS_SUMMARY_URL` (see [Configuration](#configuration)).
+4. **Deploy**: enable GitHub Pages in your fork (source "GitHub Actions"); every push to `main` publishes your
+   version at `https://<you>.github.io/<repo>/`. No servers, no API keys.
+
+**Contribute to Yaci Lens.** Ideas, bug reports and pull requests are welcome: new explorer pages and charts,
+dashboard templates, better SQL examples, fixes, and docs. Open an issue to discuss a bigger change first.
 
 ## Deploy
 
