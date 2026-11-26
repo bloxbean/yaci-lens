@@ -49,6 +49,9 @@ Browser: Yaci Lens (static) ── DuckDB-WASM ── ATTACH catalog.ducklake �
 - **Smart contracts**: scripts and dApps ranked by transactions, fees, CPU or failures over a chosen range, Plutus
   version mix, dApp trends; a page per script with activity and recent executions (each one debuggable). dApp names
   come from Strica's Cardano Contracts Registry and Cardano Fans' registry.
+- **Whales**: the 1,000 largest stake accounts by ADA held under their stake key, delegating or not: share of all
+  stake, 7- and 30-day change, pool and DRep, unwithdrawn rewards, and whether they moved in the last 24 hours, 7 or
+  30 days; how much the top 10 / 100 hold over time, and how many accounts hold 1k … 100M+ ADA.
 - **Governance**: DRep power over time and its concentration, votes by role and action type, every DRep's
   participation and record (agreement with outcomes, SPOs and the committee), and a page per action with votes by
   body, the stake-weighted DRep tally and every voter.
@@ -87,7 +90,8 @@ and publishes the results as static files. A fork that reads `data.bloxbean.org`
 
 ### Performance model
 
-DuckDB-WASM reads remote Parquet files one at a time, about 0.3 s per file. So:
+DuckDB-WASM (with the `httpfs` extension) reads only the parts of each Parquet file a query needs, using HTTP range
+requests, and opens files one at a time, about 0.3 s per file. So:
 
 | Query shape | Files read | Time |
 |---|---|---|
@@ -139,21 +143,6 @@ dashboard templates, better SQL examples, fixes, and docs. Open an issue to disc
 Yaci Lens is hosted on **GitHub Pages** at [lens.yaci.xyz](https://lens.yaci.xyz). A fork can use GitHub Pages too, or
 upload `build/` to any static web server.
 
-### Releasing (BloxBean release-ops standard)
-
-The live site changes only with a release:
-
-1. Open a PR that bumps `version` in `package.json`. `package.json`, the lockfile, the build config and the workflows
-   are owned by the release owner (`.github/CODEOWNERS`), who must approve it.
-2. After the merge, `.github/workflows/release.yml` waits for a release owner's approval in the `release`
-   environment, then builds the site (with the version shown in the footer) and pushes it to the `gh-pages` branch.
-3. GitHub's `pages-build-deployment` for that push waits for approval in the `github-pages` environment; once
-   approved, lens.yaci.xyz serves the new version.
-
-Other merges are checked and built by `ci.yml` but not published. A manual run of the Release workflow on `main`
-re-releases the current version (with the same approvals). Data updates need no release: the site reads the data at
-runtime.
-
 The page needs CORS on the data bucket (`GET`/`HEAD`, any origin, exposing `Content-Range`, `Content-Length`,
 `ETag`), which the publish job's setup covers.
 
@@ -184,6 +173,30 @@ The UI, julc integration and replay pipeline are forked from
 
 - Preprod and preview networks.
 - A serverless MCP over the same data (the Claude skill is in bloxbean/yaci-lens-skill).
+
+## Data sources and credits
+
+Not everything comes from the chain. Yaci Lens shows:
+
+- **On-chain data**: blocks, transactions, UTxOs, assets, scripts, staking, rewards and governance, indexed from Cardano
+  mainnet by [Yaci Store](https://github.com/bloxbean/yaci-store) and published daily by
+  [Yaci Lens Publisher](https://github.com/bloxbean/yaci-lens-publisher). NFT metadata (CIP-25) comes from the minting
+  transaction.
+- **Token names, tickers, decimals and logos**: the
+  [Cardano Token Registry](https://github.com/cardano-foundation/cardano-token-registry) (CIP-26) by the Cardano
+  Foundation, read by the browser from `tokens.cardano.org`.
+- **dApp names for smart contracts**: [Strica's Cardano Contracts Registry](https://github.com/StricaHQ/cardano-contracts-registry)
+  and [Cardano Fans' off-chain data registry](https://github.com/Cardano-Fans/crfa-offchain-data-registry), fetched
+  daily by the publisher (Strica's label wins when both list a script).
+- **Pool tickers and names** (CIP-6), **DRep profiles** (CIP-119) and **governance action texts** (CIP-108): the
+  documents their owners anchored on chain, fetched by the publisher and checked against the on-chain hash.
+  Self-declared, not verified.
+- **IPFS** content through public gateways (ipfs.io, dweb.link, Pinata, Blockfrost).
+- **Software**: [DuckDB-WASM](https://duckdb.org/docs/stable/clients/wasm/overview) and DuckLake by DuckDB Labs,
+  [julc](https://github.com/bloxbean/julc) for the validator lab, the UI forked from
+  [Yaci DevKit Viewer](https://github.com/bloxbean/yaci-devkit), Svelte and Lucide icons.
+
+Thank you to all of these projects. The About page in the app lists the same.
 
 ## License
 
