@@ -234,3 +234,43 @@ async function flush() {
 		}
 	}
 }
+
+export interface TokenDetail extends TokenMeta {
+	description: string | null;
+	url: string | null;
+	/** PNG as a data: URL (the registry stores logos as base64). */
+	logo: string | null;
+}
+
+/** Full CIP-26 entry of a token (for its page): description, website and logo too. Cached 7 days (unregistered: 1 day). */
+export async function tokenDetail(unit: string): Promise<TokenDetail | null> {
+	if (!/^[0-9a-f]{56,120}$/i.test(unit)) return null;
+	const key = `lens:tokendetail:${unit}`;
+	const cached = readCache<TokenDetail | null>(key, 7 * DAY, DAY);
+	if (cached) return cached.ok ? (cached.value ?? null) : null;
+	try {
+		const res = await fetch(`https://tokens.cardano.org/metadata/${unit}`, { signal: AbortSignal.timeout(8000) });
+		if (res.status === 404) {
+			writeCache(key, { at: Date.now(), ok: false });
+			return null;
+		}
+		if (!res.ok) return null;
+		const s = (await res.json()) as Record<string, { value?: unknown } | undefined>;
+		const str = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : null);
+		const d = Number(s.decimals?.value);
+		const logo = str(s.logo?.value, 400_000);
+		const url = str(s.url?.value, 200);
+		const detail: TokenDetail = {
+			name: str(s.name?.value, 50),
+			ticker: str(s.ticker?.value, 12),
+			decimals: Number.isInteger(d) && d >= 0 && d < 20 ? d : null,
+			description: str(s.description?.value, 600),
+			url: url && /^https:\/\//i.test(url) ? url : null,
+			logo: logo && /^[A-Za-z0-9+/=]+$/.test(logo) ? `data:image/png;base64,${logo}` : null
+		};
+		writeCache(key, { at: Date.now(), ok: true, value: detail });
+		return detail;
+	} catch {
+		return null;
+	}
+}

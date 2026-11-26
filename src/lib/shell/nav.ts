@@ -10,6 +10,9 @@ import Table2 from '@lucide/svelte/icons/table-2';
 import Info from '@lucide/svelte/icons/info';
 import Layers from '@lucide/svelte/icons/layers';
 import FlaskConical from '@lucide/svelte/icons/flask-conical';
+import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
+import Coins from '@lucide/svelte/icons/coins';
+import FileCode from '@lucide/svelte/icons/file-code';
 
 export interface NavItem {
 	label: string;
@@ -32,7 +35,10 @@ export const NAV: NavGroup[] = [
 		items: [
 			{ label: 'Dashboard', href: '/', icon: LayoutDashboard, keywords: 'home overview' },
 			{ label: 'Epochs', href: '/epochs', icon: Timer, keywords: 'ada pots treasury stake' },
-			{ label: 'Blocks', href: '/blocks', icon: Blocks, match: ['/transactions'], keywords: 'block transactions' },
+			{ label: 'Blocks', href: '/blocks', icon: Blocks, keywords: 'block' },
+			{ label: 'Transactions', href: '/transactions', icon: ArrowLeftRight, keywords: 'tx transactions fees' },
+			{ label: 'Assets', href: '/assets', icon: Coins, keywords: 'tokens nft native assets policy fingerprint' },
+			{ label: 'Scripts', href: '/scripts', icon: FileCode, keywords: 'smart contracts plutus dapps registry' },
 			{ label: 'Pools', href: '/pools', icon: Server, keywords: 'stake pool spo' },
 			{ label: 'Staking', href: '/staking', icon: Layers, keywords: 'delegation certificates rewards withdrawals nakamoto' }
 		]

@@ -93,3 +93,25 @@ export async function live<T = Record<string, unknown>>(sql: string, maxRows?: n
 export function day(d: Date | string | number): string {
 	return new Date(d).toISOString().slice(0, 10);
 }
+
+/**
+ * A query over summary-pack files: {name} stands for that file, e.g.
+ * `SELECT script_hash, sum(txs) FROM {script_daily} WHERE date >= DATE '2026-10-01' GROUP BY 1`.
+ * DuckDB reads only the row groups and columns the query needs. Cached for the session.
+ */
+export function summaryQuery<T = Record<string, unknown>>(sql: string): Promise<T[]> {
+	const text = sql.replace(/\{([a-z_]+)\}/g, (_, n: string) => `read_parquet(${sqlString(summaryUrl(n))})`);
+	const key = `q|${text}`;
+	let p = cache.get(key) as Promise<T[]> | undefined;
+	if (!p) {
+		p = started().then(() => rows<T>(text));
+		p.catch(() => cache.delete(key));
+		cache.set(key, p);
+	}
+	return p;
+}
+
+/** The same SQL with {name} replaced by the summary file's URL (for "open in SQL lab"). */
+export function summarySql(sql: string): string {
+	return sql.replace(/\{([a-z_]+)\}/g, (_, n: string) => `'${summaryUrl(n)}'`);
+}
