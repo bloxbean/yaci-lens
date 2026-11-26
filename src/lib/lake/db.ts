@@ -40,7 +40,10 @@ export function connect(network: Network, onStep?: (msg: string) => void): Promi
 		URL.revokeObjectURL(workerUrl);
 		const c = await db.connect();
 		onStep?.('Loading the DuckLake extension');
-		await c.query(`INSTALL ducklake; LOAD ducklake;`);
+		// httpfs reads remote files with HTTP range requests: only the footers and the row groups a query needs.
+		// Without it, DuckDB-WASM's built-in file layer downloads every remote file whole (a day's partition, the
+		// 48 MB catalog, even the 1.1 GB tx index), which made a transaction page transfer over a gigabyte.
+		await c.query(`INSTALL httpfs; LOAD httpfs; INSTALL ducklake; LOAD ducklake;`);
 		onStep?.('Attaching the catalog');
 		const url = sqlString(network.catalogUrl);
 		await c.query(`ATTACH ${url} AS ${LAKE} (TYPE ducklake, READ_ONLY)`);
@@ -52,6 +55,15 @@ export function connect(network: Network, onStep?: (msg: string) => void): Promi
 		throw e;
 	});
 	return ready;
+}
+
+/** Query timings in the console: localStorage['lens:debug'] = '1'. */
+function debugQueries(): boolean {
+	try {
+		return localStorage.getItem('lens:debug') === '1';
+	} catch {
+		return false;
+	}
 }
 
 /** Run SQL and convert the result to plain JS values. Queries run one at a time, in call order. */
@@ -82,7 +94,9 @@ export function query(sql: string, maxRows = MAX_RESULT_ROWS): Promise<QueryResu
 			}
 		}
 		if (columns.length === 0 && reader.schema) columns = reader.schema.fields.map(describe);
-		return { columns, rows, truncated, ms: Math.round(performance.now() - t0) };
+		const ms = Math.round(performance.now() - t0);
+		if (debugQueries()) console.debug(`[lens] ${ms} ms · ${rows.length} rows · ${sql.replace(/\s+/g, ' ').slice(0, 160)}`);
+		return { columns, rows, truncated, ms };
 	};
 	const p = queue.then(run, run);
 	queue = p.catch(() => undefined);
