@@ -136,8 +136,23 @@ dashboard templates, better SQL examples, fixes, and docs. Open an issue to disc
 
 ## Deploy
 
-Yaci Lens is hosted on **GitHub Pages**: `.github/workflows/pages.yml` builds and deploys on every push to `main`
-(enable Pages with source "GitHub Actions"). A fork can do the same, or upload `build/` to any static web server.
+Yaci Lens is hosted on **GitHub Pages** at [lens.yaci.xyz](https://lens.yaci.xyz). A fork can use GitHub Pages too, or
+upload `build/` to any static web server.
+
+### Releasing (BloxBean release-ops standard)
+
+The live site changes only with a release:
+
+1. Open a PR that bumps `version` in `package.json`. `package.json`, the lockfile, the build config and the workflows
+   are owned by the release owner (`.github/CODEOWNERS`), who must approve it.
+2. After the merge, `.github/workflows/release.yml` waits for a release owner's approval in the `release`
+   environment, then builds the site (with the version shown in the footer) and pushes it to the `gh-pages` branch.
+3. GitHub's `pages-build-deployment` for that push waits for approval in the `github-pages` environment; once
+   approved, lens.yaci.xyz serves the new version.
+
+Other merges are checked and built by `ci.yml` but not published. A manual run of the Release workflow on `main`
+re-releases the current version (with the same approvals). Data updates need no release: the site reads the data at
+runtime.
 
 The page needs CORS on the data bucket (`GET`/`HEAD`, any origin, exposing `Content-Range`, `Content-Length`,
 `ETag`), which the publish job's setup covers.

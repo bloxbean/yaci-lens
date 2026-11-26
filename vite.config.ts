@@ -1,8 +1,11 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import pkg from './package.json' with { type: 'json' };
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	// The released version, shown in the footer and on the About page.
+	define: { __LENS_VERSION__: JSON.stringify(pkg.version) },
 	optimizeDeps: {
 		// Icons are imported one file each; DuckDB-WASM and julc load their workers and engine files relative to their own
 		// modules (new URL(..., import.meta.url)), which pre-bundling would break.

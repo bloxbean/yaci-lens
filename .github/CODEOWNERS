@@ -1,0 +1,25 @@
+# Release owners (BloxBean release-ops standard). Combined with the `protected-branches` ruleset's "Require review
+# from Code Owners" on main, a PR that touches any of these paths needs an approving review from one of them.
+# Changing `version` in package.json releases the site (after approval in the `release` environment), and the
+# other paths decide what the release builds and how it is published.
+#
+# There is intentionally no catch-all `*` rule: other paths stay unowned and need only the usual review.
+# CODEOWNERS is last-match-wins, so keep these patterns non-overlapping.
+#
+# For now the release owner is @satran004 (also the `release` environment reviewer). Later, replace it with the
+# org team @bloxbean/release-owners (the release-ops standard), give the team write access, and make it the
+# reviewer of the `release` and `github-pages` environments.
+
+# This file, so the protection can't be removed without a release owner.
+/.github/CODEOWNERS      @satran004
+
+# Workflows: what runs, and what gets published.
+/.github/workflows/      @satran004
+
+# Version bump -> release. Dependencies are bundled into the published site.
+/package.json            @satran004
+/package-lock.json       @satran004
+
+# Build configuration of the published site.
+/svelte.config.js        @satran004
+/vite.config.ts          @satran004
