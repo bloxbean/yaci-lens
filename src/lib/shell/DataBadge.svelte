@@ -11,7 +11,7 @@
 	});
 	const title = $derived(
 		lake.tip
-			? `Published snapshot up to block #${lake.tip.block.toLocaleString('en-US')} (epoch ${lake.tip.epoch}), ${dateTime(lake.tip.blockTime.getTime())}. Updated daily.`
+			? `Published snapshot up to block #${lake.tip.block.toLocaleString('en-US')} (epoch ${lake.tip.epoch}), ${dateTime(lake.tip.blockTime.getTime())}. Updated daily, about two days behind the chain (T-2): for real-time data use Cardanoscan, Cexplorer or AdaStat.`
 			: (lake.error ?? 'Connecting to the data lake')
 	);
 </script>

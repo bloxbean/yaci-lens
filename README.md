@@ -2,10 +2,14 @@
 
 <h1 align="center">Yaci Lens</h1>
 
-<p align="center"><b>The serverless Cardano explorer.</b></p>
+<p align="center"><b>The serverless Cardano analytics explorer.</b></p>
 
 Explore Cardano blockchain data and analytics directly in your browser. Powered by Yaci Store, Apache Parquet and
 DuckDB-WASM, and hosted on GitHub Pages.
+
+> **Analytics, not real time.** Yaci Lens works on a daily snapshot that is about two days behind the chain (T-2).
+> For real-time data (the latest blocks, transactions, balances), use a community Cardano explorer such as
+> [Cardanoscan](https://cardanoscan.io), [Cexplorer](https://cexplorer.io) or [AdaStat](https://adastat.net).
 
 - No dedicated explorer backend.
 - No centralized query API.
@@ -60,7 +64,8 @@ Browser: Yaci Lens (static) ── DuckDB-WASM ── ATTACH catalog.ducklake �
   transaction you describe, and step-debug it at the UPLC level, all in the browser
   ([`@julclang/julc-wasm`](https://www.npmjs.com/package/@julclang/julc-wasm) 0.1.0-pre22).
 
-Data is a daily snapshot (the header shows "Data through …"), not live.
+Data is a daily snapshot, about two days behind the chain (T-2); the header shows "Data through …". For real-time
+data, use a community explorer such as [Cardanoscan](https://cardanoscan.io), [Cexplorer](https://cexplorer.io) or [AdaStat](https://adastat.net).
 
 ### Do I need a server?
 

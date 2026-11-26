@@ -22,7 +22,7 @@
 
 <PageHeader kind="About" title="Yaci Lens">
 	{#snippet icon()}<Info class="h-5 w-5" />{/snippet}
-	The serverless Cardano explorer.
+	The serverless Cardano analytics explorer.
 </PageHeader>
 
 <div class="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
@@ -66,9 +66,14 @@ SELECT count(*) FROM cardano.block;</pre>
 		</Panel>
 		<Panel title="Good to know">
 			<ul class="flex list-disc flex-col gap-2 pl-5 text-sm text-muted">
-				<li>Data is a daily snapshot, not live: the newest blocks are up to a day old.</li>
+				<li>
+					Data is a daily snapshot, about two days behind the chain (T-2): Yaci Lens is for analytics, not for following the chain live. For real-time
+					data, use a community explorer such as <a class="y-link" href="https://cardanoscan.io" target="_blank" rel="noopener noreferrer">Cardanoscan</a>,
+					<a class="y-link" href="https://cexplorer.io" target="_blank" rel="noopener noreferrer">Cexplorer</a> or
+					<a class="y-link" href="https://adastat.net" target="_blank" rel="noopener noreferrer">AdaStat</a>.
+				</li>
 				<li>Each Parquet file costs about 0.3 s to open from a browser. Scanning a big table without a date or epoch filter can take minutes; the SQL lab warns you.</li>
-				<li>Looking a transaction up by hash alone needs a transaction index (planned). Open transactions from their block for now.</li>
+				<li>A transaction found by hash alone is located through the transaction index; the first lookup of a session takes a few seconds.</li>
 				<li>Amounts in the lake are exact lovelace; the summary pack uses ADA as floating point for charts.</li>
 			</ul>
 		</Panel>

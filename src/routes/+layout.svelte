@@ -22,7 +22,7 @@
 </script>
 
 <svelte:head>
-	<title>Yaci Lens · the serverless Cardano explorer</title>
+	<title>Yaci Lens · the serverless Cardano analytics explorer</title>
 </svelte:head>
 
 <NavProgress />

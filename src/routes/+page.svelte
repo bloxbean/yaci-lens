@@ -39,7 +39,7 @@
 	<div>
 		<div class="mb-2 flex flex-wrap items-center gap-2 text-xs">
 			<span class="y-pill border-brand/25 bg-brand/10 font-semibold text-brand">Cardano mainnet</span>
-			<span class="y-pill border-line bg-surface text-muted">Daily snapshot · serverless</span>
+			<span class="y-pill border-line bg-surface text-muted" title="Updated daily; about two days behind the chain">Daily snapshot · T-2 · serverless</span>
 		</div>
 		<h1 class="text-3xl font-semibold sm:text-4xl">
 			Cardano, through
@@ -55,6 +55,12 @@
 			{:else}
 				{lake.step || 'Starting DuckDB'}…
 			{/if}
+		</p>
+		<p class="mt-1 text-xs text-faint">
+			Analytics on daily data, about two days behind the chain (T-2). For real-time data, use a community explorer:
+			<a class="y-link" href="https://cardanoscan.io" target="_blank" rel="noopener noreferrer">Cardanoscan</a>,
+			<a class="y-link" href="https://cexplorer.io" target="_blank" rel="noopener noreferrer">Cexplorer</a> or
+			<a class="y-link" href="https://adastat.net" target="_blank" rel="noopener noreferrer">AdaStat</a>.
 		</p>
 	</div>
 	<a href="#/sql" class="y-btn y-btn-primary h-11 px-4"><TerminalSquare class="h-4 w-4" /> Query any table in SQL</a>

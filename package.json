@@ -2,7 +2,7 @@
   "name": "yaci-lens",
   "version": "0.1.0",
   "private": true,
-  "description": "Yaci Lens: the serverless Cardano explorer. Cardano data and analytics in your browser, powered by Yaci Store, Cloudflare R2, Apache Parquet and DuckDB-WASM.",
+  "description": "Yaci Lens: the serverless Cardano analytics explorer. Cardano data and analytics in your browser, powered by Yaci Store, Apache Parquet and DuckDB-WASM.",
   "license": "MIT",
   "type": "module",
   "scripts": {
