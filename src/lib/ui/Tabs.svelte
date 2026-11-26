@@ -7,8 +7,8 @@ export interface Tab {
 </script>
 
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
+	import { replaceState } from '$app/navigation';
+	import { hashWith } from '$lib/lake/links';
 
 
 	/*
@@ -22,20 +22,14 @@ export interface Tab {
 		link = false
 	}: { tabs: Tab[]; active: string; param?: string; link?: boolean } = $props();
 
+	// Hash routing: the route and its parameters both live after '#'.
 	function hrefFor(id: string) {
-		const u = new URL(page.url);
-		u.searchParams.set(param ?? 'tab', id);
-		u.searchParams.delete('page');
-		return u.pathname + u.search;
+		return hashWith({ [param ?? 'tab']: id, page: null });
 	}
 
 	function select(id: string) {
 		active = id;
-		if (param) {
-			const u = new URL(page.url);
-			u.searchParams.set(param, id);
-			goto(u.pathname + u.search, { replaceState: true, noScroll: true, keepFocus: true });
-		}
+		if (param) replaceState(hashWith({ [param]: id }), {});
 	}
 </script>
 

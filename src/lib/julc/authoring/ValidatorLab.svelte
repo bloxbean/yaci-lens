@@ -4,7 +4,7 @@
 	import { hashWith } from '$lib/lake/links';
 	import { page as appPage } from '$app/state';
 	import { ada, num, shorten } from '$lib/format';
-	import { decodePlutusData, type PlutusData } from '$lib/cbor';
+	import { decodePlutusData, encodePlutusData, type PlutusData } from '$lib/cbor';
 	import { copyText } from '$lib/ui/toast.svelte';
 	import Panel from '$lib/ui/Panel.svelte';
 	import Badge from '$lib/ui/Badge.svelte';
@@ -23,7 +23,7 @@
 	import type { PageTx } from '../replay/load';
 	import type { CheckResponse, CompileResponse, PlutusVersion } from '../types';
 	import { parseBlueprint, type Blueprint } from '../blueprint/blueprint';
-	import { EXAMPLES } from './examples';
+	import { EXAMPLES, type Example } from './examples';
 	import { labPlan, labPurposeOf, paramData, paymentKeyHash, scriptAddress, templateOf, type LabPurpose, type LabScript, type LabTx } from './lab';
 	import { datumByHash, findUtxos } from './utxo';
 	import { javaFailureLine } from './source-debug';
@@ -127,6 +127,7 @@
 		} catch {
 			/* no storage */
 		}
+		if (!initialScript) applyPreset(EXAMPLES.find((e) => e.id === exampleId));
 		if (initialUtxo) await useUtxo(initialUtxo);
 		if (!wasmSupported()) return fail('This browser can’t run the julc engine (it needs WebAssembly GC and exception handling). Use a current Chrome, Edge, Firefox or Safari.');
 		if (!(await julc.available())) return fail('Script Lab is not installed with this viewer, so validators can’t be run here.');
@@ -183,6 +184,20 @@
 		exampleId = id;
 		redeemer = templateOf(0, []);
 		paramTexts = [];
+		applyPreset(e);
+	}
+
+	/** An example's passing starting state: datum, redeemer, signers, parameters, validity, mint. */
+	function applyPreset(e: Example | undefined) {
+		const p = e?.preset;
+		if (!p) return;
+		if (p.datum) datum = encodePlutusData(p.datum);
+		if (p.redeemer) redeemer = encodePlutusData(p.redeemer);
+		signers = [...(p.signers ?? [])];
+		paramTexts = [...(p.params ?? [])];
+		validFrom = p.validFromTip && tipSlot != null ? String(tipSlot) : '';
+		validTo = '';
+		if (p.mint) mint = p.mint.map((m) => ({ ...m }));
 	}
 
 	async function loadChainScript() {
@@ -487,7 +502,7 @@
 						<button class="y-btn h-8 text-xs" onclick={loadChainScript}>Load</button>
 					</div>
 					{#if chainError}<p class="mt-2 text-xs text-danger">{chainError}</p>{/if}
-					{#if chainScript}<p class="mt-2 text-xs text-muted">Plutus {versionOf(chainScript.type).slice(1)} · <a class="y-link mono" href="/scripts/{chainScript.hash}">{shorten(chainScript.hash, 10, 6)}</a></p>{/if}
+					{#if chainScript}<p class="mt-2 text-xs text-muted">Plutus {versionOf(chainScript.type).slice(1)} · <a class="y-link mono" href="#/scripts/{chainScript.hash}">{shorten(chainScript.hash, 10, 6)}</a></p>{/if}
 				{/if}
 				{#if scriptError}<p class="mt-3 text-xs text-danger">{scriptError}</p>{/if}
 				{#if script}
@@ -524,7 +539,7 @@
 				{#if utxo}
 					<div class="mt-3 rounded-xl border border-line bg-surface-2/60 px-3 py-2.5 text-xs">
 						<div class="flex flex-wrap items-center gap-2">
-							<a class="mono y-link" href="/transactions/{utxo.tx_hash}">{shorten(utxo.tx_hash, 10, 6)}#{utxo.output_index}</a>
+							<a class="mono y-link" href="#/transactions/{utxo.tx_hash}">{shorten(utxo.tx_hash, 10, 6)}#{utxo.output_index}</a>
 							<span class="tabular-nums">{ada(lovelaceOf(utxo), 'auto')} ada</span>
 							{#if utxo.amount.length > 1}<Badge tone="violet">+{utxo.amount.length - 1} token{utxo.amount.length > 2 ? 's' : ''}</Badge>{/if}
 							{#if utxoDatum}<Badge tone="cyan">datum</Badge>{/if}

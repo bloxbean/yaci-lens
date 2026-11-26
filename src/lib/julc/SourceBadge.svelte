@@ -8,7 +8,7 @@
 	 */
 	let { source, compact = false }: { source: 'cbor' | 'store' | null | undefined; compact?: boolean } = $props();
 
-	const rebuiltWhy = 'This Yaci Store doesn’t keep the original transaction CBOR (store.transaction.save-cbor), so the transaction was rebuilt from its JSON data. A few details can differ from what the ledger saw.';
+	const rebuiltWhy = 'The published data has no transaction CBOR, so the transaction was rebuilt from its inputs, outputs, datums and redeemers in the lake. A few details can differ from what the ledger saw.';
 </script>
 
 {#if source === 'cbor'}
@@ -21,7 +21,7 @@
 	{:else}
 		<span class="flex items-start gap-1.5 text-xs text-muted" data-source="store">
 			<Info class="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue" />
-			<span><span class="font-medium text-ink">Rebuilt from Yaci Store data.</span> {rebuiltWhy}</span>
+			<span><span class="font-medium text-ink">Rebuilt from the lake.</span> {rebuiltWhy}</span>
 		</span>
 	{/if}
 {/if}

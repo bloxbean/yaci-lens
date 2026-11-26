@@ -90,9 +90,10 @@ interface UtxoRow {
 	data_hash: string | null;
 	reference_script_hash: string | null;
 	is_collateral_return: boolean | null;
+	owner_stake_addr: string | null;
 }
 
-const UTXO_COLS = `tx_hash, output_index, owner_addr, asset_unit, quantity::VARCHAR AS quantity, inline_datum, data_hash, reference_script_hash, is_collateral_return`;
+const UTXO_COLS = `tx_hash, output_index, owner_addr, owner_stake_addr, asset_unit, quantity::VARCHAR AS quantity, inline_datum, data_hash, reference_script_hash, is_collateral_return`;
 
 function toUtxos(rows: UtxoRow[]): StoreUtxo[] {
 	const by = new Map<string, StoreUtxo>();
@@ -100,7 +101,16 @@ function toUtxos(rows: UtxoRow[]): StoreUtxo[] {
 		const key = `${r.tx_hash}#${r.output_index}`;
 		let u = by.get(key);
 		if (!u) {
-			u = { tx_hash: r.tx_hash, output_index: r.output_index, address: r.owner_addr, amount: [], data_hash: r.data_hash, inline_datum: r.inline_datum, reference_script_hash: r.reference_script_hash };
+			u = {
+				tx_hash: r.tx_hash,
+				output_index: r.output_index,
+				address: r.owner_addr,
+				stake_address: r.owner_stake_addr,
+				amount: [],
+				data_hash: r.data_hash,
+				inline_datum: r.inline_datum,
+				reference_script_hash: r.reference_script_hash
+			} as StoreUtxo;
 			by.set(key, u);
 		}
 		u.amount.push({ unit: r.asset_unit, quantity: r.quantity });
@@ -137,17 +147,39 @@ export function redeemerData(redeemerCbor: string | null): string | null {
 	}
 }
 
-interface TxRow {
+export interface TxRow {
 	tx_hash: string;
 	block: number;
+	slot: number;
 	epoch: number;
+	block_time: Date;
+	tx_index: number;
 	fee: number;
 	ttl: number | null;
 	validity_interval_start: number | null;
 	invalid: boolean;
 	inputs: string | null;
 	reference_inputs: string | null;
+	collateral_inputs: string | null;
 	required_signers: string | null;
+	total_collateral: number | null;
+	treasury_donation: number | null;
+	auxiliary_datahash: string | null;
+	script_datahash: string | null;
+}
+
+export interface LakeMint {
+	unit: string;
+	policy: string;
+	asset_name: string;
+	fingerprint: string | null;
+	quantity: string;
+}
+
+export interface LakeMetadata {
+	label: string;
+	body: string;
+	json: unknown;
 }
 interface ScriptRow {
 	script_hash: string;
@@ -174,6 +206,15 @@ export interface LakeTx {
 	block: number;
 	invalid: boolean;
 	missingInputs: string[];
+	/** The transaction row and everything the transaction page shows. */
+	row: TxRow;
+	inputs: StoreUtxo[];
+	outputs: StoreUtxo[];
+	referenceInputs: StoreUtxo[];
+	collateralInputs: StoreUtxo[];
+	collateralReturn: StoreUtxo | null;
+	mints: LakeMint[];
+	metadata: LakeMetadata[];
 }
 
 /** Everything the julc replay needs for one transaction, from the lake. */
@@ -183,18 +224,21 @@ export async function loadLakeTx(hash: string, knownDay?: string | null): Promis
 	const d = knownDay ?? (await txDay(h));
 	if (!d) throw new Error('Transaction not found in the published data (it may be newer than the snapshot).');
 	const [t] = await live<TxRow>(
-		`SELECT tx_hash, block, epoch, fee, ttl, validity_interval_start, invalid, inputs, reference_inputs, required_signers FROM transaction WHERE date = DATE '${d}' AND tx_hash = '${h}'`
+		`SELECT tx_hash, block, slot, epoch, block_time, tx_index, fee, ttl, validity_interval_start, invalid, inputs, reference_inputs, collateral_inputs,
+		required_signers, total_collateral, treasury_donation, auxiliary_datahash, script_datahash FROM transaction WHERE date = DATE '${d}' AND tx_hash = '${h}'`
 	);
 	if (!t) throw new Error(`Transaction ${h} is not in the ${d} partition.`);
 
 	const inputRefs = parse<Ref>(t.inputs);
 	const refRefs = parse<Ref>(t.reference_inputs);
-	const [resolved, outRows, scriptRows, withdrawals, mints] = await Promise.all([
-		resolveOutputs([...inputRefs, ...refRefs]),
+	const colRefs = parse<Ref>(t.collateral_inputs);
+	const [resolved, outRows, scriptRows, withdrawals, mints, metaRows] = await Promise.all([
+		resolveOutputs([...inputRefs, ...refRefs, ...colRefs]),
 		live<UtxoRow>(`SELECT ${UTXO_COLS} FROM address_utxo WHERE date = DATE '${d}' AND tx_hash = '${h}'`),
 		live<ScriptRow>(`SELECT script_hash, script_type, purpose, redeemer_index, redeemer_cbor, unit_mem, unit_steps, datum_hash FROM transaction_scripts WHERE date = DATE '${d}' AND tx_hash = '${h}' ORDER BY purpose, redeemer_index`),
 		live<{ address: string; amount: string }>(`SELECT address, amount::VARCHAR AS amount FROM withdrawal WHERE date = DATE '${d}' AND tx_hash = '${h}'`),
-		live<{ unit: string; quantity: number }>(`SELECT unit, quantity FROM assets WHERE date = DATE '${d}' AND tx_hash = '${h}'`)
+		live<LakeMint>(`SELECT unit, policy, asset_name, fingerprint, quantity::VARCHAR AS quantity FROM assets WHERE date = DATE '${d}' AND tx_hash = '${h}' ORDER BY unit`),
+		live<{ label: string; body: string }>(`SELECT label, body FROM transaction_metadata WHERE date = DATE '${d}' AND tx_hash = '${h}' ORDER BY try_cast(label AS UBIGINT)`)
 	]);
 
 	const missingInputs: string[] = [];
@@ -206,12 +250,14 @@ export async function loadLakeTx(hash: string, knownDay?: string | null): Promis
 		});
 	const inputs = pick(inputRefs);
 	const referenceInputs = pick(refRefs);
+	const collateralInputs = colRefs.flatMap((r) => resolved.get(`${r.tx_hash}#${r.output_index}`) ?? []);
 	const outputs = toUtxos(outRows.filter((r) => !r.is_collateral_return)).sort((a, b) => a.output_index - b.output_index);
+	const collateralReturn = toUtxos(outRows.filter((r) => r.is_collateral_return))[0] ?? null;
 
 	// Datums by hash: on the inputs, the outputs and the redeemers. The datum table is partitioned by the day a datum
 	// was first seen: this transaction's day, or the day an input was created.
 	const wanted = new Set<string>();
-	for (const u of [...inputs, ...outputs]) if (u.data_hash) wanted.add(u.data_hash);
+	for (const u of [...inputs, ...outputs, ...referenceInputs]) if (u.data_hash) wanted.add(u.data_hash);
 	for (const s of scriptRows) if (s.datum_hash) wanted.add(s.datum_hash);
 	for (const k of wanted) if (datumCache.has(k)) wanted.delete(k);
 	const candidateDays = [d, ...new Set(inputs.map((u) => txDays.get(u.tx_hash)).filter((x): x is string => !!x && x !== d))];
@@ -249,5 +295,14 @@ export async function loadLakeTx(hash: string, knownDay?: string | null): Promis
 		mints: mints.map((m) => ({ unit: m.unit, quantity: m.quantity })),
 		epoch: t.epoch
 	};
-	return { page, date: d, block: t.block, invalid: t.invalid, missingInputs };
+	const metadata = metaRows.map((m) => {
+		let json: unknown = m.body;
+		try {
+			json = JSON.parse(m.body);
+		} catch {
+			/* keep the text */
+		}
+		return { label: m.label, body: m.body, json };
+	});
+	return { page, date: d, block: t.block, invalid: t.invalid, missingInputs, row: t, inputs, outputs, referenceInputs, collateralInputs, collateralReturn, mints, metadata };
 }

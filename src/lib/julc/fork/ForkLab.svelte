@@ -391,7 +391,7 @@
 				<article class="rounded-2xl border bg-surface p-4 {flipped ? (passed(f) ? 'border-mint/50' : 'border-danger/50') : 'border-line'}">
 					<header class="mb-3 flex flex-wrap items-center gap-2 text-sm">
 						<span class="font-semibold">{p.purpose} #{p.index}</span>
-						<span class="text-xs text-muted">Plutus {p.language ?? '?'} · <Hash value={p.scriptHash} href="/scripts/{p.scriptHash}" head={6} tail={4} /></span>
+						<span class="text-xs text-muted">Plutus {p.language ?? '?'} · <Hash value={p.scriptHash} href="#/scripts/{p.scriptHash}" head={6} tail={4} /></span>
 						{#if flipped}
 							<span class="y-pill ml-auto {passed(f) ? 'border-mint/40 bg-mint/10 text-mint' : 'border-danger/40 bg-danger/10 text-danger'}">{passed(f) ? 'Now passes' : outcome(f) === 'couldn’t run' ? 'Can’t run now' : 'Now fails'}</span>
 						{/if}
@@ -427,7 +427,7 @@
 						<div class="mt-3 flex flex-wrap gap-2">
 							{#if f?.args}<button class="y-btn h-7 px-2.5 text-xs" onclick={() => openDebugger(p.key)}><Bug class="h-3.5 w-3.5" />Debug the fork</button>{/if}
 							{#if f?.args}<button class="y-btn h-7 px-2.5 text-xs" onclick={() => exportFixture(p.key, editCount ? 'fork' : 'original')}><Download class="h-3.5 w-3.5" />Export fixture</button>{/if}
-							<a class="y-btn h-7 px-2.5 text-xs" href="/transactions/{page.hash}/debug/{p.purpose}/{p.index}">On-chain debugger<ArrowRight class="h-3.5 w-3.5" /></a>
+							<a class="y-btn h-7 px-2.5 text-xs" href="#/transactions/{page.hash}/debug/{p.purpose}/{p.index}">On-chain debugger<ArrowRight class="h-3.5 w-3.5" /></a>
 						</div>
 					{/if}
 				</article>

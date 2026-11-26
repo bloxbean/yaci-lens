@@ -1,12 +1,33 @@
 /* Starter validators for the validator lab, in julc Java. Each compiles with julc 0.1.0-pre21, which reads plain Java: every
  * class is imported, as javac needs (the ledger and stdlib are no longer imported implicitly). */
 
+import type { PlutusData } from '$lib/cbor';
+
+/**
+ * A starting state that the example accepts, so the lab opens on a passing run; change any part to see it reject.
+ * Keys are sample key hashes (not real wallets).
+ */
+export interface Preset {
+	datum?: PlutusData;
+	redeemer?: PlutusData;
+	signers?: string[];
+	/** Script parameters, as typed in the parameter fields. */
+	params?: string[];
+	/** Valid from the chain tip (for validators that check the lower bound of the validity range). */
+	validFromTip?: boolean;
+	mint?: { tokenName: string; quantity: string }[];
+}
+
 export interface Example {
 	id: string;
 	name: string;
 	summary: string;
 	source: string;
+	preset?: Preset;
 }
+
+const OWNER = '6f776e6572000000000000000000000000000000000000000000000a';
+const BENEFICIARY = '62656e6566696369617279000000000000000000000000000000000b';
 
 export const EXAMPLES: Example[] = [
 	{
@@ -44,7 +65,14 @@ class Vesting {
         return signed && from.compareTo(datum.unlockAt()) >= 0;
     }
 }
-`
+`,
+		preset: {
+			// unlockAt 2024-01-01 (POSIX ms): claimable now, by the beneficiary, with a validity range starting at the tip
+			datum: { constructor: 0, fields: [{ bytes: OWNER }, { bytes: BENEFICIARY }, { int: '1704067200000' }] },
+			redeemer: { constructor: 0, fields: [] },
+			signers: [BENEFICIARY],
+			validFromTip: true
+		}
 	},
 	{
 		id: 'owner',
@@ -68,7 +96,8 @@ class OwnerOnly {
         return signed;
     }
 }
-`
+`,
+		preset: { params: [OWNER], signers: [OWNER], datum: { constructor: 0, fields: [] }, redeemer: { constructor: 0, fields: [] } }
 	},
 	{
 		id: 'mint',
@@ -103,6 +132,7 @@ class SignedMint {
         return true;
     }
 }
-`
+`,
+		preset: { params: [OWNER], signers: [OWNER], redeemer: { constructor: 0, fields: [{ int: '1' }] }, mint: [{ tokenName: '4c656e73', quantity: '1' }] }
 	}
 ];

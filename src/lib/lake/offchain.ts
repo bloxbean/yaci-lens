@@ -56,6 +56,20 @@ function byKey<T>(name: string, key: (r: T) => string): Promise<Map<string, T>> 
 		.catch(() => new Map());
 }
 
+/** dApp label for a script hash, from Strica's Cardano Contracts Registry or Cardano Fans' CRFA registry. */
+export interface ScriptLabel {
+	script_hash: string;
+	label: string;
+	project: string;
+	category: string | null;
+	url: string | null;
+	source: 'strica' | 'crfa';
+}
+
+let scripts: Promise<Map<string, ScriptLabel>> | null = null;
+/** Script labels by script hash (hex). */
+export const scriptLabels = () => (scripts ??= byKey<ScriptLabel>('script_names', (r) => r.script_hash));
+
 let pools: Promise<Map<string, PoolMeta>> | null = null;
 let dreps: Promise<Map<string, DRepMeta>> | null = null;
 let actions: Promise<Map<string, ActionMeta>> | null = null;
