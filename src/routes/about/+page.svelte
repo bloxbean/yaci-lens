@@ -30,7 +30,7 @@
 		<Panel>
 			<p class="text-[15px] leading-relaxed">
 				Explore Cardano blockchain data and analytics directly in your browser. Powered by
-				<a class="y-link" href="https://github.com/bloxbean/yaci-store" target="_blank" rel="noopener noreferrer">Yaci Store</a>, Cloudflare R2, Apache Parquet and DuckDB-WASM.
+				<a class="y-link" href="https://github.com/bloxbean/yaci-store" target="_blank" rel="noopener noreferrer">Yaci Store</a>, Apache Parquet and DuckDB-WASM, and hosted on GitHub Pages.
 			</p>
 			<ul class="mt-4 grid gap-2 sm:grid-cols-2">
 				{#each points as p (p)}<li class="flex items-center gap-2 text-sm"><Check class="h-4 w-4 shrink-0 text-mint" />{p}</li>{/each}
@@ -40,7 +40,7 @@
 		<Panel title="How it works">
 			<ol class="flex list-decimal flex-col gap-3 pl-5 text-sm leading-relaxed text-muted">
 				<li><b class="text-ink">Yaci Store indexes mainnet</b> and its analytics store exports every table as Apache Parquet files, one partition per UTC day or per epoch, tracked by a DuckLake catalog.</li>
-				<li><b class="text-ink">A daily job publishes them to Cloudflare R2</b>: the new files, a copy of the catalog pointing at the public URL, and a small summary pack for dashboards. R2 has no egress fees, so serving the data costs only storage.</li>
+				<li><b class="text-ink">A daily job publishes them to object storage</b>: the new files, a copy of the catalog pointing at the public URL, and a small summary pack for dashboards. Serving static files costs little more than storage.</li>
 				<li><b class="text-ink">This page is static.</b> DuckDB, compiled to WebAssembly, runs in your tab: it attaches the catalog over HTTPS and reads only the parts of the Parquet files a query needs, with HTTP range requests.</li>
 				<li><b class="text-ink">Queries stay fast when they name a partition</b> (<code>WHERE date = …</code> or <code>WHERE epoch = …</code>): DuckDB skips every other file using the catalog's statistics. History-wide charts come from the summary pack.</li>
 			</ol>

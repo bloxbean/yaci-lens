@@ -1,9 +1,11 @@
-# Yaci Lens
+<p align="center"><img src="docs/yaci-lens-icon.svg" width="112" alt="Yaci Lens"></p>
 
-**The serverless Cardano explorer.**
+<h1 align="center">Yaci Lens</h1>
 
-Explore Cardano blockchain data and analytics directly in your browser. Powered by Yaci Store, Cloudflare R2,
-Apache Parquet and DuckDB-WASM.
+<p align="center"><b>The serverless Cardano explorer.</b></p>
+
+Explore Cardano blockchain data and analytics directly in your browser. Powered by Yaci Store, Apache Parquet and
+DuckDB-WASM, and hosted on GitHub Pages.
 
 - No dedicated explorer backend.
 - No centralized query API.
@@ -17,7 +19,7 @@ Apache Parquet and DuckDB-WASM.
 ```
 Yaci Store (mainnet) ──analytics export──► Parquet + DuckLake catalog (one partition per UTC day / epoch)
         │
-        └─ yaci-lens-publisher (daily) ──────► Cloudflare R2: https://data.bloxbean.org/mainnet/v1/
+        └─ yaci-lens-publisher (daily) ──────► object storage: https://data.bloxbean.org/mainnet/v1/
                                                  catalog.ducklake   the catalog (frozen DuckLake)
                                                  a/ or b/           the Parquet files (A/B slots)
                                                  summary/*.parquet  small precomputed tables for dashboards
@@ -62,7 +64,7 @@ Data is a daily snapshot (the header shows "Data through …"), not live.
 
 ### Do I need a server?
 
-No. Yaci Lens is a static site: fork it and host `build/` on GitHub Pages, Cloudflare Pages, R2 or any web server.
+No. Yaci Lens is a static site: fork it and host `build/` on GitHub Pages or any static web server.
 Everything it shows comes from files in the data bucket or is fetched by the browser itself:
 
 - the lake and the summary pack (Parquet) from `data.bloxbean.org`, read with HTTP range requests;
@@ -107,10 +109,8 @@ on any static host without rewrite rules.
 
 ## Deploy
 
-- **GitHub Pages**: `.github/workflows/pages.yml` builds and deploys on push to `main` (enable Pages with source
-  "GitHub Actions").
-- **Cloudflare Pages / R2 / nginx**: upload `build/`. Note Cloudflare Pages' 25 MiB per-file limit: the julc engine
-  (`*.wasm`, ~35 MB) exceeds it, so either host on GitHub Pages / R2 / nginx, or serve the engine elsewhere.
+Yaci Lens is hosted on **GitHub Pages**: `.github/workflows/pages.yml` builds and deploys on every push to `main`
+(enable Pages with source "GitHub Actions"). A fork can do the same, or upload `build/` to any static web server.
 
 The page needs CORS on the data bucket (`GET`/`HEAD`, any origin, exposing `Content-Range`, `Content-Length`,
 `ETag`), which the publish job's setup covers.
