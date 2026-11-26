@@ -1,0 +1,197 @@
+/* Private wire codec and synchronous API. Also loaded by SDK tests without a VM. The worker loads this file before
+ * the launcher, and the engine uses it instead of evaluating its own copy when both come from one JuLC build
+ * (ADR-077 D2), so a Content Security Policy need not allow 'unsafe-eval'. */
+(() => {
+  'use strict';
+  // The JuLC build this file belongs to. The build stamps it (build.gradle, wasmVersion); the source says dev.
+  const julcVersion = "0.1.0-pre22";
+  const LONG_MIN = -(1n << 63n), LONG_MAX = (1n << 63n) - 1n;
+  const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  function invalid(message) {
+    return Object.assign(new Error(message), { code: 'invalid-request', status: 400, body: { error: message } });
+  }
+  // Structured Plutus Data as the JSON text the engine reads. Iterative, with an explicit stack, so a deeply nested
+  // value cannot exhaust the JavaScript stack; it checks each node, and fails, in the order a depth-first walk
+  // would, and holes in an array give empty elements, as Array.prototype.map and join do.
+  function dataText(root) {
+    const out = [];
+    // Pending work, last first: text to append, {value} to encode, or {entry} of a map.
+    const stack = [{ value: root }];
+    const children = (prefix, items, suffix) => {
+      const work = [prefix];
+      for (let i = 0; i < items.length; i++) {
+        if (i > 0) work.push(',');
+        if (i in items) work.push({ value: items[i] });
+      }
+      work.push(suffix);
+      for (let i = work.length - 1; i >= 0; i--) stack.push(work[i]);
+    };
+    while (stack.length > 0) {
+      const task = stack.pop();
+      if (typeof task === 'string') { out.push(task); continue; }
+      if (own(task, 'entry')) {
+        const e = task.entry;
+        if (!e || !own(e, 'k') || !own(e, 'v') || Object.keys(e).length !== 2) throw invalid('Expected map entry {k, v}');
+        stack.push('}', { value: e.v }, ',"v":', { value: e.k }, '{"k":');
+        continue;
+      }
+      const value = task.value;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid('Expected structured Plutus Data');
+      const kinds = ['int', 'bytes', 'list', 'map', 'constructor'].filter(k => own(value, k));
+      if (kinds.length !== 1) throw invalid('Data must have exactly one constructor');
+      const kind = kinds[0];
+      if (Object.keys(value).some(k => k !== kind && !(kind === 'constructor' && k === 'fields'))) {
+        throw invalid('Unexpected Data field');
+      }
+      switch (kind) {
+        case 'int':
+          if (typeof value.int !== 'bigint') throw invalid('Data int must be BigInt');
+          out.push('{"int":' + value.int.toString() + '}');
+          break;
+        case 'constructor': {
+          if (typeof value.constructor !== 'bigint' || value.constructor < 0n || value.constructor >= 1n << 64n) {
+            throw invalid('Data constructor must be a BigInt in unsigned Word64 range');
+          }
+          const tag = value.constructor.toString(), fields = value.fields;
+          if (!Array.isArray(fields)) throw invalid('Expected Data array');
+          children('{"constructor":' + tag + ',"fields":[', fields, ']}');
+          break;
+        }
+        case 'bytes':
+          if (typeof value.bytes !== 'string' || !/^(?:[0-9a-fA-F]{2})*$/.test(value.bytes)) throw invalid('Data bytes must be hex');
+          out.push(JSON.stringify({ bytes: value.bytes }));
+          break;
+        case 'list': {
+          const items = value.list;
+          if (!Array.isArray(items)) throw invalid('Expected Data array');
+          children('{"list":[', items, ']}');
+          break;
+        }
+        case 'map': {
+          const entries = value.map;
+          if (!Array.isArray(entries)) throw invalid('Data map must be an entry array');
+          const work = ['{"map":['];
+          for (let i = 0; i < entries.length; i++) {
+            if (i > 0) work.push(',');
+            if (i in entries) work.push({ entry: entries[i] });
+          }
+          work.push(']}');
+          for (let i = work.length - 1; i >= 0; i--) stack.push(work[i]);
+          break;
+        }
+      }
+    }
+    return out.join('');
+  }
+  function encode(value, schema, legacy = false) {
+    if (value == null) return value;
+    if (schema === 'long' || schema === 'bigint') {
+      if (legacy && typeof value === 'number' && Number.isInteger(value)) value = BigInt(value);
+      if (typeof value !== 'bigint') throw invalid('Expected BigInt');
+      if (schema === 'long' && (value < LONG_MIN || value > LONG_MAX)) throw invalid('Integer exceeds signed long range');
+      return value.toString();
+    }
+    if (schema === 'data') {
+      if (own(value, 'value') || own(value, 'format')) return { ...value };
+      return { format: 'json', value: dataText(value) };
+    }
+    if (schema === 'int') {
+      if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) throw invalid('Expected 32-bit integer Number');
+      return value;
+    }
+    if (Array.isArray(schema)) {
+      if (!Array.isArray(value)) throw invalid('Expected array');
+      return value.map(v => encode(v, schema[0], legacy));
+    }
+    if (schema && typeof schema === 'object') {
+      if (typeof value !== 'object' || Array.isArray(value)) throw invalid('Expected request object');
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, encode(v, schema.$map ?? schema[k], legacy)]));
+    }
+    return value;
+  }
+  function decode(envelope) {
+    let body = envelope.body;
+    for (const path of envelope.integers) {
+      if (path.length === 0) { body = BigInt(body); continue; }
+      let parent = body;
+      for (let i = 0; i < path.length - 1; i++) parent = parent[path[i]];
+      const key = path[path.length - 1];
+      parent[key] = BigInt(parent[key]);
+    }
+    if (envelope.status !== 200) {
+      // vm.applyParams names some kinds of 400 and 422 (ADR-077); every other body keeps the status's code.
+      const named = ({400: ['work-limit-exceeded'], 422: ['invalid-schema', 'parameter-mismatch']})[envelope.status];
+      const code = named?.includes(body?.code)
+        ? body.code : ({400: 'invalid-request', 404: 'not-found', 422: 'blueprint-error'})[envelope.status] || 'internal';
+      throw Object.assign(new Error(body?.error || body?.diagnostics?.[0]?.message || code),
+        { code, status: envelope.status, body });
+    }
+    return body;
+  }
+  function legacy(value) {
+    if (typeof value === 'bigint') return Number(value);
+    if (Array.isArray(value)) return value.map(legacy);
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, legacy(v)]));
+    return value;
+  }
+  // The image passes its groups (EngineInfo): JuLC's full and VM images, or an image another language builds on
+  // julc-wasm (ADR-064).
+  // engineJulcVersion is the JuLC version the image was built with (JsApi.julcVersion()), reported as
+  // features().julcVersion for the client's release check (ADR-077 D1a).
+  function install(invoke, schemas, variant, version, groups, engineJulcVersion) {
+    if (!Array.isArray(groups) || groups.length === 0) throw new Error('Engine groups are required');
+    if (typeof engineJulcVersion !== 'string' || engineJulcVersion === '') throw new Error('Engine JuLC version is required');
+    groups = [...groups];
+    const api = { version: () => version, features: () => ({
+      api: 0, variant, groups: [...groups], defaultProtocol: 11, bls: false, julcVersion: engineJulcVersion,
+    }) };
+    Object.defineProperty(api, '__schemas', { value: schemas });
+    const created = new Set();
+    for (const [method, schema] of Object.entries(schemas)) {
+      const [group, name] = method.split('.');
+      if (!groups.includes(group)) throw new Error('Operation ' + method + ' is outside the engine groups');
+      if (!created.has(group)) {
+        // A group must not replace or extend a member every engine has (version, features) or every object has.
+        if (group in api) throw new Error('Reserved engine group: ' + group);
+        api[group] = {};
+        created.add(group);
+      }
+      // A profile name stands for JuLC's cost model record, which JsMarshalling marks; another language's is passed as given.
+      const profileShorthand = schema?.costModel?.$costModel === true;
+      api[group][name] = (request = {}) => {
+        if (profileShorthand && typeof request.costModel === 'string') {
+          request = { ...request, costModel: { profile: request.costModel } };
+        }
+        return decode(JSON.parse(invoke(method, JSON.stringify(encode(request, schema)))));
+      };
+    }
+    if (groups.includes('uplc')) {
+      api.uplc ??= {};
+      api.uplc.defaultTransaction = defaultTransaction;
+    }
+    return api;
+  }
+  function defaultTransaction({ purpose = 'spend', scriptHash = '$self' } = {}) {
+    if (scriptHash !== '$self' && !/^[0-9a-fA-F]{56}$/.test(scriptHash)) throw invalid('Expected a 28-byte script hash');
+    const credential = scriptHash === '$self' ? scriptHash : 'script:' + scriptHash;
+    const alice = 'a11ce'.padEnd(56, '0'), bob = 'b0b'.padEnd(56, '0');
+    const unit = {format: 'uplc', value: 'Constr 0 []'};
+    const change = (amount, assets = []) => ({address: {payment: 'key:' + alice}, value: {lovelace: amount, assets}, datum: {kind: 'none'}});
+    const wallet = {txId: 'feed'.padEnd(64, '0'), index: 1n, address: {payment: 'key:' + alice}, value: {lovelace: '100000000'}, datum: {kind: 'none'}};
+    const tx = {purpose: {type: purpose, index: 0, target: ['reward', 'vote'].includes(purpose) ? credential : scriptHash, voterType: 'drep'}, redeemer: unit,
+      inputs: [wallet], referenceInputs: [], outputs: [change('99800000')], fee: '200000', mint: [],
+      certificates: [], withdrawals: [], validRange: {from: null, to: null, fromInclusive: true, toInclusive: true},
+      signatories: [], datums: [], txId: '7ac0'.padEnd(64, '0'), votes: [], proposals: []};
+    switch (purpose) {
+      case 'spend': tx.inputs.unshift({txId: 'c0ffee'.padEnd(64, '0'), index: 0n, address: {payment: credential}, value: {lovelace: '10000000'}, datum: {kind: 'inline', data: unit}}); tx.outputs = [change('109800000')]; break;
+      case 'mint': tx.mint = [{policyId: scriptHash, tokenName: '746f6b656e', quantity: '1'}]; tx.outputs = [change('99800000', tx.mint)]; break;
+      case 'reward': tx.withdrawals = [{credential, amount: '0'}]; break;
+      case 'certify': tx.certificates = [{type: 'regStaking', credential, deposit: '2000000'}]; tx.outputs = [change('97800000')]; break;
+      case 'vote': tx.votes = [{voterType: 'drep', voter: credential, actionTxId: '90e1'.padEnd(64, '0'), actionIndex: 0n, vote: 'yes'}]; break;
+      case 'propose': tx.proposals = [{deposit: '100000000000', returnCredential: 'key:' + alice, actionType: 'treasuryWithdrawals', guardrail: scriptHash, withdrawals: [{credential: 'key:' + bob, amount: '1000000'}]}]; break;
+      default: throw invalid('Unknown script purpose: ' + purpose);
+    }
+    return tx;
+  }
+  globalThis.JulcRuntime = { julcVersion, install, encode, decode, legacy, dataText, invalid, defaultTransaction };
+})();

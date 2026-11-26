@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<link rel="icon" href="/favicon.png" type="image/png" sizes="128x128" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content="Yaci Lens: the serverless Cardano analytics explorer. Cardano blockchain data and analytics in your browser (daily data, T-2), powered by Yaci Store, Apache Parquet and DuckDB-WASM." />
+		<meta name="theme-color" content="#0e0f12" />
+		<script>
+			// Apply the saved or OS theme before first paint, so there's no flash.
+			(function () {
+				try {
+					var t = localStorage.getItem('lens:theme');
+					if (t !== 'yaci' && t !== 'yaci-dark') {
+						t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'yaci-dark' : 'yaci';
+					}
+					document.documentElement.setAttribute('data-theme', t);
+				} catch (e) {}
+			})();
+		</script>
+		<link href="/_app/immutable/entry/start.BEjIfdgB.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/qfCWtNCO.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/Cb9M24YY.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DBn576-B.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/Djia22qo.js" rel="modulepreload">
+		<link href="/_app/immutable/entry/app.Csk9rjhl.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/CmsKOCeN.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/Dh0_e2y0.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/BYWVQOtR.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DmJ6azrR.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/BZRXLeep.js" rel="modulepreload">
+		<link href="/_app/immutable/nodes/0.1QL8Tl3e.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/BrkJLcQB.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/yut9rvC-.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/ByCeIkAO.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DA7BM0Cx.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/BC22QkFH.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/JdvYg6d2.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DVch0_-G.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/BMH5NvRV.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DagEkPnc.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/CvOCHC2I.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/BEoIgJbZ.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/BM2bvaGY.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/CGgIdSUA.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DtWpCpTz.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/BOyKDd4G.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DVTuyL9V.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/PuGbZAUZ.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/B53Bq7gI.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/iXY0O6sB.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DmZh_U7j.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/C6kVZK2N.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/uNU7JoId.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/Bmy5aEMn.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/jVDTqoDS.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/1jSaFLVj.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DWdOAFnI.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DEJ6Y-zR.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/CHTbvE2M.js" rel="modulepreload">
+		
+		<link href="/_app/immutable/assets/0.8BA0hFSX.css" rel="stylesheet">
+	</head>
+	<body>
+		<div style="display: contents">
+			<script>
+				{
+					__sveltekit_6blpdl = {
+						base: new URL('.', location).pathname.slice(0, -1)
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("/_app/immutable/entry/start.BEjIfdgB.js"),
+						import("/_app/immutable/entry/app.Csk9rjhl.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element);
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>
