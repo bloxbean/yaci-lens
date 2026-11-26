@@ -61,6 +61,7 @@ SELECT count(*) FROM cardano.block;</pre>
 				<div><dt class="y-label">Tip</dt><dd>{lake.tip ? `block #${int(lake.tip.block)}, epoch ${lake.tip.epoch}` : '…'}</dd></div>
 				<div><dt class="y-label">Published</dt><dd>{lake.tip?.generatedAt ? utc(lake.tip.generatedAt) : '…'} · updated daily</dd></div>
 				<div><dt class="y-label">Catalog</dt><dd class="break-all font-mono text-xs">{network.catalogUrl}</dd></div>
+				<div><dt class="y-label">Yaci Lens</dt><dd>v{__LENS_VERSION__}</dd></div>
 				<div><dt class="y-label">Engine</dt><dd>DuckDB-WASM {duckdbWasmVersion}</dd></div>
 			</dl>
 		</Panel>
