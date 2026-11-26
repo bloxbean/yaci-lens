@@ -3,6 +3,8 @@ export interface Tab {
 	id: string;
 	label: string;
 	count?: number | null;
+	/** Still loading: a spinner where the count goes. */
+	loading?: boolean;
 }
 </script>
 
@@ -47,7 +49,9 @@ export interface Tab {
 			onclick={link ? undefined : () => select(t.id)}
 		>
 			{t.label}
-			{#if t.count != null}
+			{#if t.loading}
+				<span class="h-3 w-3 animate-spin rounded-full border-[1.5px] border-faint/40 border-t-brand" aria-label="loading"></span>
+			{:else if t.count != null}
 				<span class="rounded-full px-1.5 text-[11px] tabular-nums {on ? 'bg-brand/15 text-brand' : 'bg-surface-2 text-faint'}">{t.count}</span>
 			{/if}
 			{#if on}<span class="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-grad"></span>{/if}
