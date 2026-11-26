@@ -63,6 +63,7 @@
 	const evRows = $derived(events?.unit === unit ? events.rows : null);
 	const meta = $derived(nft?.unit === unit ? nft.meta : null);
 	const image = $derived(meta ? imageUrl(meta.image) : null);
+	let imageFailed = $state(false);
 
 	let range = $state(rangeOf(hashParam('range'), '90d').id);
 	const r = $derived(rangeOf(range));
@@ -107,10 +108,10 @@
 		<section class="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
 			<div class="y-panel relative flex items-center gap-5 overflow-hidden p-5">
 				<div class="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand/10 blur-2xl"></div>
-				{#if image}
-					<img src={image} alt={String(meta?.name ?? info.name)} class="h-20 w-20 shrink-0 rounded-2xl border border-line object-cover" referrerpolicy="no-referrer" loading="lazy" />
-				{:else if reg?.logo}
+				{#if reg?.logo}
 					<img src={reg.logo} alt={reg.ticker ?? info.name} class="h-16 w-16 shrink-0 rounded-full border border-line object-cover" />
+				{:else if image && !imageFailed}
+					<img src={image} alt={String(meta?.name ?? info.name)} class="h-20 w-20 shrink-0 rounded-2xl border border-line object-cover" referrerpolicy="no-referrer" loading="lazy" onerror={() => (imageFailed = true)} />
 				{:else}
 					<AssetAvatar policy={info.policy} name={info.name} size={64} />
 				{/if}
@@ -150,7 +151,7 @@
 					{/await}
 				{/if}
 			</Panel>
-			<Panel title="Mint & burn" sub={a.event_dates && a.event_dates.length >= 40 ? 'The 40 earliest days with a mint or burn' : 'Every mint and burn'} flush>
+			<Panel title="Mint & burn" sub={a.event_dates && a.event_dates.split(',').length >= 40 ? 'The 40 earliest days with a mint or burn' : 'Every mint and burn'} flush>
 				{#if !evRows}
 					<Skeleton rows={5} />
 				{:else if !evRows.length}
@@ -171,7 +172,7 @@
 		</section>
 
 		{#if meta}
-			<Panel title="NFT metadata (CIP-25)" sub="From the transaction that minted it" class="mb-6">
+			<Panel title="Mint metadata (CIP-25)" sub="Label 721 of the transaction that first minted it" class="mb-6">
 				<JsonView value={meta} label="CIP-25 metadata" />
 			</Panel>
 		{/if}

@@ -19,7 +19,8 @@ export interface AssetInfo {
 	burns: number;
 	first_date: Date;
 	last_date: Date;
-	event_dates: Date[] | null;
+	/** Days with a mint or burn (first 40), as 'YYYY-MM-DD,YYYY-MM-DD,…'. */
+	event_dates: string | null;
 }
 
 export interface TokenRow {
@@ -74,7 +75,8 @@ function files(lookup: 'unit' | 'fingerprint'): Promise<string[]> {
 	);
 }
 
-const COLS = 'unit, policy, asset_name, fingerprint, supply::VARCHAR AS supply, mints, burns, first_date, last_date, event_dates';
+const COLS =
+	"unit, policy, asset_name, fingerprint, supply::VARCHAR AS supply, mints, burns, first_date, last_date, array_to_string(list_transform(event_dates, d -> strftime(d, '%Y-%m-%d')), ',') AS event_dates";
 
 /** One asset by unit (policy id + asset name hex), or null if it was never minted. */
 export async function assetByUnit(unit: string): Promise<AssetInfo | null> {
@@ -115,7 +117,7 @@ export const policyInfo = (policy: string) =>
 
 /** Mint and burn events of an asset, from the days its index row lists (up to 40 days). */
 export async function mintEvents(a: AssetInfo): Promise<MintEvent[]> {
-	const days = (a.event_dates ?? [a.first_date]).map((d) => new Date(d).toISOString().slice(0, 10));
+	const days = a.event_dates ? a.event_dates.split(',').filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)) : [new Date(a.first_date).toISOString().slice(0, 10)];
 	if (!days.length) return [];
 	return live<MintEvent>(
 		`SELECT tx_hash, quantity::VARCHAR AS quantity, block, block_time, date FROM assets

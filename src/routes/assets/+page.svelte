@@ -5,6 +5,7 @@
 	import Layers from '@lucide/svelte/icons/layers';
 	import Activity from '@lucide/svelte/icons/activity';
 	import Image from '@lucide/svelte/icons/image';
+	import BadgeCheck from '@lucide/svelte/icons/badge-check';
 	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/ui/PageHeader.svelte';
 	import Panel from '$lib/ui/Panel.svelte';
@@ -34,8 +35,13 @@
 	const tipDay = $derived(lake.tip?.date ?? null);
 
 	// ---- search -------------------------------------------------------------------------------------------------
-	let text = $state('');
+	let text = $state(hashParam('q') ?? '');
+	$effect(() => {
+		const q0 = hashParam('q');
+		if (q0) run(q0);
+	});
 	let results = $state<TokenRow[] | null>(null);
+	let showAll = $state(false);
 	let searching = $state(false);
 	let searchError = $state<string | null>(null);
 	let timer: ReturnType<typeof setTimeout> | null = null;
@@ -66,7 +72,7 @@
 		if (v.trim().length < 2) return void (results = null);
 		searching = true;
 		searchTokens(v)
-			.then((rows) => (results = rows))
+			.then((rows) => ((results = rows), (showAll = false)))
 			.catch((err) => (searchError = String(err?.message ?? err)))
 			.finally(() => (searching = false));
 	}
@@ -165,12 +171,14 @@ SELECT a.policy, a.txs, a.days, t.unit, t.name, p.sample_unit, p.units FROM a LE
 			<div class="mt-4 overflow-x-auto">
 				<table class="w-full text-sm">
 					<thead>
-						<tr class="border-b border-line text-left"><th class="y-label py-2 pr-4">Token</th><th class="y-label py-2 pr-4">Policy</th><th class="y-label py-2 pr-4 text-right">Supply</th><th class="y-label py-2 pr-4 text-right">Mints</th><th class="y-label py-2 text-right" title="Transactions moving the policy's tokens, last 30 days">Txs (30d)</th></tr>
+						<tr class="border-b border-line text-left"><th class="y-label py-2 pr-4">Token</th><th class="y-label py-2 pr-4" title="Listed in the Cardano token registry (CIP-26): name, ticker and decimals registered by the issuer">Registry</th><th class="y-label py-2 pr-4">Policy</th><th class="y-label py-2 pr-4 text-right">Supply</th><th class="y-label py-2 pr-4 text-right">Mints</th><th class="y-label py-2 text-right" title="Transactions moving the policy's tokens, last 30 days">Txs (30d)</th></tr>
 					</thead>
 					<tbody>
-						{#each results as t (t.unit)}
+						{#each showAll ? results : results.slice(0, 10) as t (t.unit)}
+							{@const reg = tokenName(t.unit)}
 							<tr class="border-b border-line/60 last:border-0 hover:bg-surface-2/60">
 								<td class="py-2 pr-4"><AssetChip unit={t.unit} />{#if t.standard}<span class="ml-1.5 text-[10px] text-faint">{t.standard}</span>{/if}</td>
+								<td class="py-2 pr-4">{#if reg}<span class="inline-flex items-center gap-1 text-xs text-mint"><BadgeCheck class="h-3.5 w-3.5" />listed</span>{:else}<span class="text-xs text-faint">—</span>{/if}</td>
 								<td class="py-2 pr-4"><a class="y-link mono text-xs" href="#/assets/policy/{t.policy}">{shorten(t.policy, 8, 6)}</a> <NameTag kind="script" id={t.policy} /></td>
 								<td class="py-2 pr-4 text-right tabular-nums">{short(Number(t.supply))}</td>
 								<td class="py-2 pr-4 text-right tabular-nums text-muted">{t.mints}</td>
@@ -179,6 +187,8 @@ SELECT a.policy, a.txs, a.days, t.unit, t.name, p.sample_unit, p.units FROM a LE
 						{/each}
 					</tbody>
 				</table>
+				{#if results.length > 10 && !showAll}<button class="mt-2 text-xs text-brand hover:underline" onclick={() => (showAll = true)}>Show all {results.length}</button>{/if}
+				<p class="mt-2 text-xs text-faint">Anyone can mint a token with any name: check the policy id. Ranked by how busy the token's policy was in the last 30 days.</p>
 			</div>
 		{/if}
 	{/if}

@@ -76,7 +76,7 @@ export function summary<T = Record<string, unknown>>(name: string, extra = ''): 
 	const key = `${name}|${extra}`;
 	let p = cache.get(key) as Promise<T[]> | undefined;
 	if (!p) {
-		p = started().then(() => rows<T>(`SELECT * FROM read_parquet(${sqlString(summaryUrl(name))}) ${extra}`));
+		p = started().then(() => rows<T>(`SELECT * FROM read_parquet(${sqlString(summaryUrl(name))}) ${extra}`, Infinity));
 		p.catch(() => cache.delete(key));
 		cache.set(key, p);
 	}
@@ -104,7 +104,7 @@ export function summaryQuery<T = Record<string, unknown>>(sql: string): Promise<
 	const key = `q|${text}`;
 	let p = cache.get(key) as Promise<T[]> | undefined;
 	if (!p) {
-		p = started().then(() => rows<T>(text));
+		p = started().then(() => rows<T>(text, Infinity));
 		p.catch(() => cache.delete(key));
 		cache.set(key, p);
 	}

@@ -78,6 +78,7 @@
 							<div><dt class="y-label">Votes (count of voters)</dt><dd class="tabular-nums">DReps {d.yes} yes / {d.no} no / {d.abstain} abstain · SPOs {s.yes} / {s.no} / {s.abstain} · CC {c.yes} / {c.no} / {c.abstain}</dd></div>
 							{#if p.anchor_url}<div><dt class="y-label">Anchor</dt><dd class="break-all"><a class="y-link" href={p.anchor_url.replace(/^ipfs:\/\//, 'https://ipfs.io/ipfs/')} target="_blank" rel="noopener noreferrer">{p.anchor_url}</a></dd></div>{/if}
 							<div><dt class="y-label">Transaction</dt><dd class="font-mono text-xs break-all">{p.tx_hash}#{p.idx}</dd></div>
+							<div><a class="y-btn h-8 text-xs" href="#/governance/actions/{p.tx_hash}/{p.idx}">Votes, voters and stake →</a></div>
 						</dl>
 						<div class="flex min-w-0 flex-col gap-3">
 							{#await actionMeta() then am}

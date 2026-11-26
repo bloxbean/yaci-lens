@@ -164,19 +164,19 @@ WHERE date = DATE '${new Date(t.last_date).toISOString().slice(0, 10)}' AND scri
 				<div class="y-label mb-2">What it was run for</div>
 				<SplitBar
 					parts={[
-						{ label: 'Spend', value: sum(rows, 'spend')::DOUBLE, color: seriesColor(0) },
-						{ label: 'Mint', value: sum(rows, 'mint')::DOUBLE, color: seriesColor(1) },
-						{ label: 'Withdraw (reward)', value: sum(rows, 'reward')::DOUBLE, color: seriesColor(2) },
-						{ label: 'Other (cert, vote, propose)', value: sum(rows, 'other')::DOUBLE, color: seriesColor(3) }
+						{ label: 'Spend', value: sum(rows, 'spend'), color: seriesColor(0) },
+						{ label: 'Mint', value: sum(rows, 'mint'), color: seriesColor(1) },
+						{ label: 'Withdraw (reward)', value: sum(rows, 'reward'), color: seriesColor(2) },
+						{ label: 'Other (cert, vote, propose)', value: sum(rows, 'other'), color: seriesColor(3) }
 					]}
 				/>
 			</div>
 			<div>
 				<div class="y-label mb-2">Average cost per transaction</div>
 				<dl class="grid grid-cols-3 gap-4 text-sm">
-					<div><dt class="text-xs text-muted">Fee</dt><dd class="font-semibold tabular-nums">₳{(sum(rows, 'fees_ada')::DOUBLE / Math.max(1, sum(rows, 'txs')::DOUBLE)).toFixed(3)}</dd></div>
-					<div><dt class="text-xs text-muted">CPU steps</dt><dd class="font-semibold tabular-nums">{short(sum(rows, 'steps')::DOUBLE / Math.max(1, sum(rows, 'txs')::DOUBLE))}</dd></div>
-					<div><dt class="text-xs text-muted">Memory</dt><dd class="font-semibold tabular-nums">{short(sum(rows, 'mem')::DOUBLE / Math.max(1, sum(rows, 'txs')::DOUBLE))}</dd></div>
+					<div><dt class="text-xs text-muted">Fee</dt><dd class="font-semibold tabular-nums">₳{(sum(rows, 'fees_ada') / Math.max(1, sum(rows, 'txs'))).toFixed(3)}</dd></div>
+					<div><dt class="text-xs text-muted">CPU steps</dt><dd class="font-semibold tabular-nums">{short(sum(rows, 'steps') / Math.max(1, sum(rows, 'txs')))}</dd></div>
+					<div><dt class="text-xs text-muted">Memory</dt><dd class="font-semibold tabular-nums">{short(sum(rows, 'mem') / Math.max(1, sum(rows, 'txs')))}</dd></div>
 				</dl>
 			</div>
 		</div>
