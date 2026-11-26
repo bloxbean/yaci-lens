@@ -4,8 +4,18 @@
 
 <p align="center"><b>The serverless Cardano analytics explorer.</b></p>
 
-Explore Cardano blockchain data and analytics directly in your browser. Powered by Yaci Store, Apache Parquet and
-DuckDB-WASM, and hosted on GitHub Pages.
+<p align="center">
+<i>A deeper look into Cardano.</i><br>
+Explore blockchain data. Discover insights. Build dashboards. Debug smart contracts.
+</p>
+
+<p align="center">
+Open data. Open source. Powered by your browser.<br>
+Powered by <a href="https://github.com/bloxbean/yaci-store">Yaci Store</a>, <a href="https://ducklake.select">DuckLake</a>,
+<a href="https://duckdb.org">DuckDB</a> and <a href="https://parquet.apache.org">Apache Parquet</a>.
+</p>
+
+Yaci Lens is a static website hosted on GitHub Pages. DuckDB-WASM runs the queries in your browser.
 
 > **Analytics, not real time.** Yaci Lens works on a daily snapshot that is about two days behind the chain (T-2).
 > For real-time data (the latest blocks, transactions, balances), use a community Cardano explorer such as
