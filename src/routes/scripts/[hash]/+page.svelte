@@ -141,7 +141,7 @@ WHERE date = DATE '${new Date(t.last_date).toISOString().slice(0, 10)}' AND scri
 	<div class="y-panel mb-6"><ErrorBox title="Couldn't load the script" message={String(e?.message ?? e)} retry={() => attempt++} /></div>
 {/await}
 
-<Panel title="Activity" sub="Transactions running this script, and those where a script failed" class="mb-6">
+<Panel title="Activity" sub="Transactions that ran this script" class="mb-6">
 	{#snippet actions()}
 		<div class="flex items-center gap-2"><RangePicker bind:value={range} /><SqlButton sql={summarySql(daySql)} /></div>
 	{/snippet}
@@ -151,13 +151,10 @@ WHERE date = DATE '${new Date(t.last_date).toISOString().slice(0, 10)}' AND scri
 		{@const b = bucket(rows, ['txs', 'failed_txs', 'fees_ada', 'steps'], r.days)}
 		<SeriesChart
 			x={b.map((x) => x.label)}
-			series={[
-				{ name: 'Succeeded', values: b.map((x) => x.values.txs - x.values.failed_txs), slot: 0 },
-				{ name: 'Failed (collateral taken)', values: b.map((x) => x.values.failed_txs), color: 'rgb(var(--c-danger))' }
-			]}
-			kind="stacked"
+			series={[{ name: 'Transactions', values: b.map((x) => x.values.txs), slot: 0 }]}
+			kind="bar"
 			height={190}
-			label="Transactions per period, succeeded and failed"
+			label="Transactions per period"
 		/>
 		<div class="mt-6 grid gap-6 lg:grid-cols-2">
 			<div>

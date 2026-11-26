@@ -8,6 +8,10 @@
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import Github from './GithubIcon.svelte';
 	import X from '@lucide/svelte/icons/x';
+	import { dashboards } from '$lib/dashboards/store.svelte';
+	import { onMount } from 'svelte';
+
+	onMount(() => void dashboards.load());
 
 	const current = $derived(activeHref(routePath(page.url)));
 
@@ -40,6 +44,18 @@
 								{#if !compact}<span class="truncate">{item.label}</span>{/if}
 							</a>
 						</li>
+						{#if item.href === '/dashboards' && !compact && dashboards.list.length}
+							<li>
+								<ul class="ml-[1.35rem] flex flex-col gap-0.5 border-l border-line pl-2.5">
+									{#each dashboards.list.slice(0, 12) as d (d.id)}
+										{@const on = page.url.hash.startsWith(`#/dashboards/${d.id}`)}
+										<li>
+											<a href="#/dashboards/{d.id}" class="block truncate rounded-lg px-2 py-1 text-[12.5px] {on ? 'bg-brand/10 text-ink' : 'text-muted hover:bg-surface-2 hover:text-ink'}" title={d.name}>{d.name}</a>
+										</li>
+									{/each}
+								</ul>
+							</li>
+						{/if}
 					{/each}
 				</ul>
 			</div>

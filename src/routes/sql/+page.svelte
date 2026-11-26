@@ -14,6 +14,7 @@
 	import Chart from '$lib/ui/Chart.svelte';
 	import SqlEditor from '$lib/sql/SqlEditor.svelte';
 	import ResultTable from '$lib/sql/ResultTable.svelte';
+	import SaveToDashboard from '$lib/dashboards/SaveToDashboard.svelte';
 	import { cancel, query, type QueryResult } from '$lib/lake/db';
 	import { lake, started, summaryUrl } from '$lib/lake/lake.svelte';
 	import { tables, type TableInfo } from '$lib/lake/catalog';
@@ -160,6 +161,7 @@ LIMIT 20`;
 			</span>
 			<button class="y-btn h-9" onclick={share} title="Copy a link that opens this query"><Link2 class="h-4 w-4" /> Share</button>
 			<button class="y-btn h-9" onclick={csv} disabled={!result?.rows.length}><Download class="h-4 w-4" /> CSV</button>
+			<SaveToDashboard {sql} />
 		</div>
 
 		{#if warning}

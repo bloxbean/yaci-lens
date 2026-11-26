@@ -23,8 +23,8 @@
 	import { shorten } from '$lib/format';
 
 	/*
-	 * Smart-contract analytics: which Plutus scripts and dApps are used, by transactions, fees, execution units
-	 * and failures, over a chosen range. Per-script daily totals come from the summary pack (script_daily); dApp
+	 * Smart-contract analytics: which Plutus scripts and dApps are used, by transactions, fees and execution units,
+	 * over a chosen range. (Failed transactions aren't counted per script: the data has no redeemers for them.) Per-script daily totals come from the summary pack (script_daily); dApp
 	 * names from Strica's and Cardano Fans' registries (script_names). Fees of a transaction count for every script
 	 * it ran.
 	 */
@@ -33,12 +33,11 @@
 	const from = $derived(lake.tip?.date && r.days ? since(lake.tip.date, r.days) : '1900-01-01');
 	const where = $derived(`date > DATE '${from}'`);
 
-	type Metric = 'txs' | 'fees_ada' | 'steps' | 'failed_txs';
+	type Metric = 'txs' | 'fees_ada' | 'steps';
 	const METRICS: { id: Metric; label: string; fmt: (v: number) => string }[] = [
 		{ id: 'txs', label: 'Transactions', fmt: (v) => short(v) },
 		{ id: 'fees_ada', label: 'Fees', fmt: (v) => `₳${short(v)}` },
-		{ id: 'steps', label: 'CPU steps', fmt: (v) => short(v) },
-		{ id: 'failed_txs', label: 'Failures', fmt: (v) => short(v) }
+		{ id: 'steps', label: 'CPU steps', fmt: (v) => short(v) }
 	];
 	let metric = $state<Metric>((hashParam('by') as Metric) ?? 'txs');
 	const m = $derived(METRICS.find((x) => x.id === metric) ?? METRICS[0]);
@@ -127,7 +126,7 @@ WHERE ${where.replace('date', 'd.date')} GROUP BY ALL ORDER BY 1`);
 <PageHeader kind="Explore" title="Smart contracts">
 	{#snippet icon()}<FileCode class="h-5 w-5" />{/snippet}
 	{#snippet actions()}<RangePicker bind:value={range} />{/snippet}
-	Plutus scripts and the dApps behind them: how much they are used, what they cost and how often they fail. dApp names come from Strica's Cardano Contracts
+	Plutus scripts and the dApps behind them: how much they are used and what they cost. dApp names come from Strica's Cardano Contracts
 	Registry and Cardano Fans' dApp registry.
 </PageHeader>
 

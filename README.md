@@ -25,9 +25,25 @@ Yaci Store (mainnet) ──analytics export──► Parquet + DuckLake catalog 
 Browser: Yaci Lens (static) ── DuckDB-WASM ── ATTACH catalog.ducklake ── HTTP range reads of only the needed files
 ```
 
-- **Explorer pages** (dashboard, epochs, blocks, transactions, pools, staking, governance, DReps) read the summary pack for
-  history-wide views (one request each) and run live lake queries that touch a few partitions (a block, a day, an
-  epoch). Every live panel has an **SQL** button that opens its query in the SQL lab.
+- **Explorer pages** (dashboard, epochs, blocks, transactions, assets, scripts, pools, staking, governance, DReps) read
+  the summary pack for history-wide views (one request each) and run live lake queries that touch a few partitions
+  (a block, a day, an epoch). Every panel has an **SQL** button that opens its query in the SQL lab.
+- **Transactions** as in Yaci Viewer: inputs and outputs (inputs resolved from the days they were created), the
+  balance, scripts re-run in the browser with julc and compared with the on-chain budget, mint & burn, metadata,
+  certificates & votes, collateral, reference inputs, signers. **Fork in the lab** opens the what-if lab with the
+  real transaction loaded. A transaction list shows any day, newest first.
+- **Assets**: search tokens by name, ticker, policy, unit or `asset1…` fingerprint (an index of all ~11M assets is
+  read with range requests); token activity, minting trends, most used tokens and largest collections; token pages
+  with supply, mint/burn history, CIP-26 registry details and CIP-25 metadata.
+- **Smart contracts**: scripts and dApps ranked by transactions, fees, CPU or failures over a chosen range, Plutus
+  version mix, dApp trends; a page per script with activity and recent executions (each one debuggable). dApp names
+  come from Strica's Cardano Contracts Registry and Cardano Fans' registry.
+- **Governance**: DRep power over time and its concentration, votes by role and action type, every DRep's
+  participation and record (agreement with outcomes, SPOs and the committee), and a page per action with votes by
+  body, the stake-weighted DRep tally and every voter.
+- **Dashboard lab**: personal dashboards of SQL widgets (number, line, area, bars, stacked bars, ranked list, split
+  bar, table), stored only in the browser (IndexedDB). Export/import as JSON, or share a link that carries the
+  whole dashboard in the URL. Templates to start from.
 - **SQL lab**: any SQL over the whole lake (47 tables, ~150 GB) in DuckDB-WASM, with schema completion, examples,
   CSV export, share links and a quick chart. It warns when a query on a big table has no `date`/`epoch` filter.
 - **Transactions by hash** and **script debugging of real transactions**: the published tx index maps a hash to
@@ -43,6 +59,19 @@ Browser: Yaci Lens (static) ── DuckDB-WASM ── ATTACH catalog.ducklake �
   ([`@julclang/julc-wasm`](https://www.npmjs.com/package/@julclang/julc-wasm) 0.1.0-pre22).
 
 Data is a daily snapshot (the header shows "Data through …"), not live.
+
+### Do I need a server?
+
+No. Yaci Lens is a static site: fork it and host `build/` on GitHub Pages, Cloudflare Pages, R2 or any web server.
+Everything it shows comes from files in the data bucket or is fetched by the browser itself:
+
+- the lake and the summary pack (Parquet) from `data.bloxbean.org`, read with HTTP range requests;
+- token names from the CIP-26 registry and governance documents from IPFS/hosts that allow it, cached in
+  `localStorage`; personal dashboards in IndexedDB.
+
+The only server is the one that **produces** the data (Yaci Store plus the daily publish job), which also fetches
+off-chain metadata most hosts don't let browsers read (pool, DRep and proposal documents) and the dApp registries,
+and publishes the results as static files. A fork that reads `data.bloxbean.org` runs nothing at all.
 
 ### Performance model
 
@@ -95,7 +124,9 @@ two variables above pointing at it.
 ## Project layout
 
 ```
-src/lib/lake/      DuckDB-WASM session, lake state, summary pack, catalog, examples, table notes
+src/lib/lake/      DuckDB-WASM session, lake state, summary pack, catalog, examples, assets, votes, replay loader
+src/lib/charts/    SeriesChart, BarList, SplitBar, RangePicker (series colours validated per theme)
+src/lib/dashboards/ Dashboard lab: store (IndexedDB), runner, widgets, templates
 src/lib/api/       lake-backed stand-in for Yaci Store's REST client (used by the julc code)
 src/lib/julc/      julc engine, validator lab, UPLC debugger, replay pipeline (forked from Yaci Viewer)
 src/lib/shell/     sidebar, top bar, search, data badge (from Yaci Viewer)
@@ -110,7 +141,7 @@ The UI, julc integration and replay pipeline are forked from
 ## Roadmap
 
 - Preprod and preview networks.
-- A Claude skill and a serverless MCP over the same data.
+- A serverless MCP over the same data (the Claude skill is in bloxbean/yaci-lens-skill).
 
 ## License
 

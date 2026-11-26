@@ -13,6 +13,7 @@ import FlaskConical from '@lucide/svelte/icons/flask-conical';
 import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
 import Coins from '@lucide/svelte/icons/coins';
 import FileCode from '@lucide/svelte/icons/file-code';
+import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 
 export interface NavItem {
 	label: string;
@@ -54,6 +55,7 @@ export const NAV: NavGroup[] = [
 		label: 'Analytics',
 		items: [
 			{ label: 'SQL lab', href: '/sql', icon: TerminalSquare, keywords: 'query duckdb editor' },
+			{ label: 'Dashboard lab', href: '/dashboards', icon: LayoutGrid, keywords: 'my dashboards personal charts widgets' },
 			{ label: 'Tables', href: '/tables', icon: Table2, keywords: 'schema columns catalog' },
 			{ label: 'Validator lab', href: '/lab', icon: FlaskConical, keywords: 'julc plutus uplc debug' },
 			{ label: 'About', href: '/about', icon: Info, keywords: 'how it works self-host' }
