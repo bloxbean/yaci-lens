@@ -46,6 +46,43 @@
 			</ol>
 		</Panel>
 
+		<Panel title="Data sources and credits" sub="Not everything comes from the chain: names, labels and documents come from these sources">
+			<dl class="flex flex-col gap-4 text-sm leading-relaxed">
+				<div>
+					<dt class="font-medium">On-chain data</dt>
+					<dd class="text-muted">Blocks, transactions, UTxOs, assets, scripts, staking, rewards and governance: indexed from Cardano mainnet by <a class="y-link" href="https://github.com/bloxbean/yaci-store" target="_blank" rel="noopener noreferrer">Yaci Store</a> and published daily by <a class="y-link" href="https://github.com/bloxbean/yaci-lens-publisher" target="_blank" rel="noopener noreferrer">Yaci Lens Publisher</a>. NFT metadata (CIP-25) comes from the minting transaction itself.</dd>
+				</div>
+				<div>
+					<dt class="font-medium">Token names, tickers, decimals and logos</dt>
+					<dd class="text-muted">The <a class="y-link" href="https://github.com/cardano-foundation/cardano-token-registry" target="_blank" rel="noopener noreferrer">Cardano Token Registry</a> (CIP-26), run by the Cardano Foundation. Your browser reads it from <code>tokens.cardano.org</code>.</dd>
+				</div>
+				<div>
+					<dt class="font-medium">dApp names for smart contracts</dt>
+					<dd class="text-muted"><a class="y-link" href="https://github.com/StricaHQ/cardano-contracts-registry" target="_blank" rel="noopener noreferrer">Strica's Cardano Contracts Registry</a> (the labels Cardanoscan shows) and <a class="y-link" href="https://github.com/Cardano-Fans/crfa-offchain-data-registry" target="_blank" rel="noopener noreferrer">Cardano Fans' off-chain data registry</a>, fetched daily by the publisher. Strica's label wins when both list a script. Thank you to both projects.</dd>
+				</div>
+				<div>
+					<dt class="font-medium">Pool tickers and names</dt>
+					<dd class="text-muted">Each pool's own metadata (CIP-6), at the URL its operator registered on chain. Fetched daily by the publisher and checked against the hash on chain: self-declared by the operator, not verified by anyone.</dd>
+				</div>
+				<div>
+					<dt class="font-medium">DRep profiles and governance action texts</dt>
+					<dd class="text-muted">The documents their authors anchored on chain (CIP-119, CIP-108), fetched by the publisher and hash-checked; DRep and proposal pages can also load the full document in your browser. Self-declared, like pool names.</dd>
+				</div>
+				<div>
+					<dt class="font-medium">IPFS</dt>
+					<dd class="text-muted"><code>ipfs://</code> links (documents, NFT images) are read through public gateways: ipfs.io, dweb.link, Pinata and Blockfrost.</dd>
+				</div>
+				<div>
+					<dt class="font-medium">Software</dt>
+					<dd class="text-muted">
+						<a class="y-link" href="https://duckdb.org/docs/stable/clients/wasm/overview" target="_blank" rel="noopener noreferrer">DuckDB-WASM</a> and DuckLake by DuckDB Labs (the engine loads from jsDelivr, its extensions from extensions.duckdb.org);
+						<a class="y-link" href="https://github.com/bloxbean/julc" target="_blank" rel="noopener noreferrer">julc</a> for the validator lab and script debugger; the UI is forked from
+						<a class="y-link" href="https://github.com/bloxbean/yaci-devkit" target="_blank" rel="noopener noreferrer">Yaci DevKit Viewer</a>; built with Svelte and Lucide icons.
+					</dd>
+				</div>
+			</dl>
+		</Panel>
+
 		<Panel title="Use the data elsewhere">
 			<p class="mb-3 text-sm text-muted">The same data works from any DuckDB 1.5+, with no key:</p>
 			<pre class="overflow-x-auto rounded-xl border border-line bg-surface-2 p-4 font-mono text-xs leading-relaxed">INSTALL ducklake;

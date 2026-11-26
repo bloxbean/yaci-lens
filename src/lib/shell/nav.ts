@@ -14,6 +14,7 @@ import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
 import Coins from '@lucide/svelte/icons/coins';
 import FileCode from '@lucide/svelte/icons/file-code';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+import Fish from '@lucide/svelte/icons/fish';
 
 export interface NavItem {
 	label: string;
@@ -41,7 +42,8 @@ export const NAV: NavGroup[] = [
 			{ label: 'Assets', href: '/assets', icon: Coins, keywords: 'tokens nft native assets policy fingerprint' },
 			{ label: 'Scripts', href: '/scripts', icon: FileCode, keywords: 'smart contracts plutus dapps registry' },
 			{ label: 'Pools', href: '/pools', icon: Server, keywords: 'stake pool spo' },
-			{ label: 'Staking', href: '/staking', icon: Layers, keywords: 'delegation certificates rewards withdrawals nakamoto' }
+			{ label: 'Staking', href: '/staking', icon: Layers, keywords: 'delegation certificates rewards withdrawals nakamoto' },
+			{ label: 'Whales', href: '/whales', icon: Fish, keywords: 'largest stake accounts holders rich list balances' }
 		]
 	},
 	{
