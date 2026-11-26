@@ -144,7 +144,7 @@ upload `build/` to any static web server.
 The live site changes only with a release:
 
 1. Open a PR that bumps `version` in `package.json`. `package.json`, the lockfile, the build config and the workflows
-   are owned by `@bloxbean/release-owners` (`.github/CODEOWNERS`), so a release owner must approve it.
+   are owned by the release owner (`.github/CODEOWNERS`), who must approve it.
 2. After the merge, `.github/workflows/release.yml` waits for a release owner's approval in the `release`
    environment, then builds the site (with the version shown in the footer) and pushes it to the `gh-pages` branch.
 3. GitHub's `pages-build-deployment` for that push waits for approval in the `github-pages` environment; once
