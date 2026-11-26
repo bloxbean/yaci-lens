@@ -1,0 +1,1 @@
+import{p as r,n as t}from"./BpD-LnAS.js";const n={get error(){return r.error},get params(){return r.params},get status(){return r.status},get url(){return r.url}},a={get to(){return t.current?t.current.to:null}},g=n,s=a;export{s as n,g as p};

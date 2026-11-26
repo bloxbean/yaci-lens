@@ -1,0 +1,1 @@
+import"./DNN2-yam.js";import{s,r as a}from"./CGRZLpGf.js";import{I as p}from"./MZ7tGeCw.js";var n=new Set(["$$slots","$$events","$$legacy"]);function $(r,t){let o=a(t,n);const e={name:"arrow-right",size:24,node:[["path",{d:"M5 12h14"}],["path",{d:"m12 5 7 7-7 7"}]]};p(r,s(()=>o,{get icon(){return e}}))}export{$ as A};

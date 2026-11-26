@@ -1,1 +1,0 @@
-import"./Dh0_e2y0.js";import{s as o,r as a}from"./BYWVQOtR.js";import{I as p}from"./BrkJLcQB.js";var n=new Set(["$$slots","$$events","$$legacy"]);function h(e,t){let r=a(t,n);const s={name:"table-2",size:24,node:[["path",{d:"M3 9h18"}],["path",{d:"M9 3v18"}],["rect",{x:"3",y:"3",width:"18",height:"18",rx:"2"}]]};p(e,o(()=>r,{get icon(){return s}}))}export{h as T};

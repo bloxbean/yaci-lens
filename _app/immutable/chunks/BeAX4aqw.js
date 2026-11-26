@@ -1,0 +1,1 @@
+import"./DNN2-yam.js";import{s as c,r as o}from"./CGRZLpGf.js";import{I as a}from"./MZ7tGeCw.js";var p=new Set(["$$slots","$$events","$$legacy"]);function m(e,r){let s=o(r,p);const t={name:"circle-x",size:24,node:[["circle",{cx:"12",cy:"12",r:"10"}],["path",{d:"m15 9-6 6"}],["path",{d:"m9 9 6 6"}]],aliases:["x-circle"]};a(e,c(()=>s,{get icon(){return t}}))}export{m as C};
