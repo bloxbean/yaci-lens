@@ -1,4 +1,4 @@
-/* Row shapes of the summary pack (cardano-data-r2-publish/summary.sql). Amounts are ADA, not lovelace. */
+/* Row shapes of the summary pack (yaci-lens-publisher/summary.sql). Amounts are ADA, not lovelace. */
 
 export interface Epoch {
 	epoch: number;

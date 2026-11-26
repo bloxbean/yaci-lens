@@ -74,7 +74,7 @@ SELECT count(*) FROM cardano.block;</pre>
 		</Panel>
 		<Panel title="Self-hosting">
 			<p class="text-sm text-muted">
-				Publish your own Yaci Store export with the <code>cardano-data-r2-publish</code> job to any S3-compatible bucket with public reads and CORS, then build Yaci Lens with
+				Publish your own Yaci Store export with <a class="y-link" href="https://github.com/bloxbean/yaci-lens-publisher" target="_blank" rel="noopener noreferrer">Yaci Lens Publisher</a> to any S3-compatible bucket with public reads and CORS, then build Yaci Lens with
 				<code>VITE_LENS_CATALOG_URL</code> and <code>VITE_LENS_SUMMARY_URL</code> pointing at it.
 			</p>
 		</Panel>

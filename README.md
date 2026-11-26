@@ -17,7 +17,7 @@ Apache Parquet and DuckDB-WASM.
 ```
 Yaci Store (mainnet) ──analytics export──► Parquet + DuckLake catalog (one partition per UTC day / epoch)
         │
-        └─ cardano-data-r2-publish (daily) ──► Cloudflare R2: https://data.bloxbean.org/mainnet/v1/
+        └─ yaci-lens-publisher (daily) ──────► Cloudflare R2: https://data.bloxbean.org/mainnet/v1/
                                                  catalog.ducklake   the catalog (frozen DuckLake)
                                                  a/ or b/           the Parquet files (A/B slots)
                                                  summary/*.parquet  small precomputed tables for dashboards
@@ -117,8 +117,8 @@ The page needs CORS on the data bucket (`GET`/`HEAD`, any origin, exposing `Cont
 
 ## Self-hosting the data
 
-Publish your own Yaci Store analytics export (DuckLake with a DuckDB catalog) with the `cardano-data-r2-publish`
-job (bloxbean/release-ops) to any S3-compatible bucket with public reads and CORS, then build Yaci Lens with the
+Publish your own Yaci Store analytics export (DuckLake with a DuckDB catalog) with
+[Yaci Lens Publisher](https://github.com/bloxbean/yaci-lens-publisher) to any S3-compatible bucket with public reads and CORS, then build Yaci Lens with the
 two variables above pointing at it.
 
 ## Project layout

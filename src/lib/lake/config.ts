@@ -1,5 +1,5 @@
 /*
- * Where the data lives. Each network is a "frozen DuckLake" published by cardano-data-r2-publish (release-ops):
+ * Where the data lives. Each network is a "frozen DuckLake" published by yaci-lens-publisher (github.com/bloxbean/yaci-lens-publisher):
  * one catalog file, the Parquet files it references, and a small summary pack, all read-only over HTTPS.
  * Self-hosting: point catalogUrl/summaryUrl at your own bucket (any S3-compatible store with public reads + CORS).
  */
