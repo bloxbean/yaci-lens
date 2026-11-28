@@ -235,15 +235,41 @@ export async function txByHash(hashes: string[], meter = new Meter()): Promise<M
 	return meter.done(out);
 }
 
-/** Full transactions for 8-byte hash prefixes (utxo.spend stores prefixes). A prefix can, very rarely, match two. */
-async function txByPrefix(prefixes: string[], meter: Meter): Promise<Map<string, TxInfo[]>> {
+/** The first slot of the "recent" part (the month cutoff), from the manifest. */
+async function cutoffSlot(): Promise<number> {
+	const m = await manifest();
+	return Math.floor(Date.parse(`${m.cutoff}T00:00:00Z`) / 1000) - 1591566291;
+}
+
+/**
+ * Full transactions for 8-byte hash prefixes (utxo.spend stores prefixes). A prefix can, very rarely, match two.
+ * `slots` (when known, e.g. the spending slot) says which part holds the transaction; unknown ones are looked up in
+ * the recent part first and in history only when missing there (each history shard is another file to open).
+ */
+async function txByPrefix(prefixes: string[], meter: Meter, slots = new Map<string, number>()): Promise<Map<string, TxInfo[]>> {
 	const want = [...new Set(prefixes)];
 	const out = new Map<string, TxInfo[]>();
 	if (!want.length) return out;
-	const rows = await runKeys(meter, 'utxo', want, (ks) => ({
-		sql: ks.map(() => `SELECT lower(hex(hash)) AS hash, slot, block, idx, outs, fee, flags FROM tx WHERE hash >= ? AND hash <= ?`).join(' UNION ALL '),
-		params: ks.flatMap((p) => [blob(p + '00'.repeat(24)), blob(p + 'ff'.repeat(24))])
-	}));
+	const ps = await parts('utxo');
+	const cut = await cutoffSlot();
+	const look = async (p: Part, keys: string[], lane0: number) => {
+		const groups = new Map<FileEntry, string[]>();
+		for (const k of keys) groups.set(fileFor(p, k), [...(groups.get(fileFor(p, k)) ?? []), k]);
+		const res = await Promise.all(
+			[...groups.entries()].map(async ([f, ks], i) =>
+				run(meter, await open(f), ks.map(() => `SELECT lower(hex(hash)) AS hash, slot, block, idx, outs, fee, flags FROM tx WHERE hash >= ? AND hash <= ?`).join(' UNION ALL '), ks.flatMap((k) => [blob(k + '00'.repeat(24)), blob(k + 'ff'.repeat(24))]), lane0 + i)
+			)
+		);
+		return res.flat();
+	};
+	const recent = ps.find((p) => p.part !== 'history');
+	const history = ps.find((p) => p.part === 'history');
+	const toRecent = want.filter((k) => !slots.has(k) || slots.get(k)! >= cut);
+	const toHistory = want.filter((k) => slots.has(k) && slots.get(k)! < cut);
+	const rows = [...(recent ? await look(recent, toRecent, 0) : []), ...(history && toHistory.length ? await look(history, toHistory, 1) : [])];
+	const found = new Set(rows.map((r) => String(r.hash).slice(0, 16)));
+	const missing = toRecent.filter((k) => !found.has(k) && !slots.has(k));
+	if (history && missing.length) rows.push(...(await look(history, missing, 2)));
 	for (const r of rows) {
 		const t = toTx(r);
 		const p = t.hash.slice(0, 16);
@@ -283,7 +309,11 @@ export async function txLinks(hash: string, meter = new Meter()): Promise<Measur
 	const tx = (await txByHash([h], meter)).data.get(h) ?? null;
 	const kids = await runAll(meter, 'utxo', `SELECT out_idx, lower(hex(by_tx)) AS by8, slot, lovelace, flags FROM spend WHERE out_tx = ? ORDER BY out_idx`, [blob(p)], p);
 	const pars = await runAll(meter, 'utxo', `SELECT lower(hex(out_tx)) AS out8, out_idx, slot, lovelace, flags FROM spend_by WHERE by_tx = ? ORDER BY out_tx, out_idx`, [blob(p)], p);
-	const full = await txByPrefix([...kids.map((r) => String(r.by8)), ...pars.map((r) => String(r.out8))], meter);
+	// a spending transaction is in the part of its slot; a parent (whose output was spent) is at or before the spend
+	const hints = new Map(kids.map((r) => [String(r.by8), Number(r.slot)] as [string, number]));
+	const cut = await cutoffSlot();
+	for (const r of pars) if (Number(r.slot) < cut) hints.set(String(r.out8), Number(r.slot));
+	const full = await txByPrefix([...kids.map((r) => String(r.by8)), ...pars.map((r) => String(r.out8))], meter, hints);
 	let ambiguous = false;
 	const pick = (prefix: string, pred: (t: TxInfo) => boolean) => {
 		const c = full.get(prefix) ?? [];
@@ -494,7 +524,7 @@ export async function spentStatus(outputs: { tx: string; idx: number; slot: numb
 		sql: ks.map(() => `SELECT lower(hex(out_tx)) AS out8, out_idx, lower(hex(by_tx)) AS by8, slot FROM spend WHERE out_tx = ? AND out_idx = ?`).join(' UNION ALL '),
 		params: ks.flatMap((k) => [blob(k.split(':')[0]), Number(k.split(':')[1])])
 	}));
-	const full = await txByPrefix(spent.map((x) => String(x.by8)), meter);
+	const full = await txByPrefix(spent.map((x) => String(x.by8)), meter, new Map(spent.map((x) => [String(x.by8), Number(x.slot)] as [string, number])));
 	for (const o of outputs) {
 		const x = spent.find((r) => r.out8 === o.tx.slice(0, 16) && Number(r.out_idx) === o.idx && Number(r.slot) >= o.slot);
 		out.set(`${o.tx}#${o.idx}`, x ? ((full.get(String(x.by8)) ?? []).find((t) => t.slot === Number(x.slot))?.hash ?? (full.get(String(x.by8)) ?? [])[0]?.hash ?? String(x.by8)) : null);

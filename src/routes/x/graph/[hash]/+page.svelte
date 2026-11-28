@@ -21,7 +21,7 @@
 	 */
 	const PER_SIDE = 12;
 	const MAX_NODES = 150;
-	const W = 190;
+	const W = 230;
 	const H = 54;
 	const GAP_X = 120;
 	const GAP_Y = 18;
@@ -63,6 +63,14 @@
 		return n;
 	}
 
+	/** Nodes are replaced, not mutated: a Map in $state is not deeply reactive. */
+	function setNode(hash: string, patch: Partial<Node>) {
+		const n = nodes.get(hash);
+		if (!n) return;
+		nodes.set(hash, { ...n, ...patch });
+		nodes = new Map(nodes);
+	}
+
 	function addEdge(e: Edge) {
 		const key = `${e.outTx}#${e.outIdx}>${e.byTx}`;
 		if (!edges.has(key)) {
@@ -74,20 +82,16 @@
 	async function load(hash: string) {
 		const n = nodes.get(hash);
 		if (!n || n.links || n.loading) return;
-		n.loading = true;
-		nodes = new Map(nodes);
+		setNode(hash, { loading: true });
 		try {
 			svc ??= await import('$lib/indexdb/service');
 			const r = await svc.txLinks(hash);
 			cost = r.cost;
 			total = { requests: total.requests + r.cost.requests, bytes: total.bytes + r.cost.bytes, ms: total.ms + r.cost.ms, queries: total.queries + r.cost.queries };
-			n.links = r.data;
-			n.tx = r.data.tx;
-			n.loading = false;
-			nodes = new Map(nodes);
+			setNode(hash, { links: r.data, tx: r.data.tx, loading: false });
 			expand(hash, 'both');
 		} catch (e) {
-			n.loading = false;
+			setNode(hash, { loading: false });
 			error = e instanceof Error ? e.message : String(e);
 		}
 	}
@@ -96,20 +100,21 @@
 	function expand(hash: string, side: 'parents' | 'children' | 'both') {
 		const n = nodes.get(hash);
 		if (!n?.links) return;
+		let { shownP, shownC } = n;
 		if (side !== 'children') {
 			// group the inputs by the transaction that made them: one node per parent tx
 			const byTx = groupBy(n.links.parents, (e) => e.outTx);
-			const next = byTx.slice(n.shownP, n.shownP + PER_SIDE);
+			const next = byTx.slice(shownP, shownP + PER_SIDE);
 			for (const [tx, es] of next) if (place(tx, n.gen - 1)) es.forEach(addEdge);
-			n.shownP += next.length;
+			shownP += next.length;
 		}
 		if (side !== 'parents') {
 			const byTx = groupBy(n.links.children, (e) => e.byTx);
-			const next = byTx.slice(n.shownC, n.shownC + PER_SIDE);
+			const next = byTx.slice(shownC, shownC + PER_SIDE);
 			for (const [tx, es] of next) if (place(tx, n.gen + 1)) es.forEach(addEdge);
-			n.shownC += next.length;
+			shownC += next.length;
 		}
-		nodes = new Map(nodes);
+		setNode(hash, { shownP, shownC });
 	}
 
 	function groupBy(es: Edge[], key: (e: Edge) => string): [string, Edge[]][] {
@@ -189,7 +194,7 @@
 						{@const x2 = pb.x}
 						{@const y2 = pb.y + H / 2}
 						<path d="M{x1},{y1} C{x1 + GAP_X / 2},{y1} {x2 - GAP_X / 2},{y2} {x2},{y2}" fill="none" class={e.collateral ? 'stroke-amber' : 'stroke-faint/60'} stroke-width="1.4" stroke-dasharray={e.collateral ? '4 3' : undefined} marker-end="url(#arrow)" />
-						<text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 4} text-anchor="middle" class="fill-muted font-mono" font-size="10">#{e.outIdx} {e.lovelace != null ? ada(e.lovelace) : ''}</text>
+						<text x={x1 + (x2 - x1) * 0.72} y={y1 + (y2 - y1) * 0.86 - 4} text-anchor="middle" class="fill-muted font-mono" font-size="10">#{e.outIdx} {e.lovelace != null ? ada(e.lovelace) : ''}</text>
 					{/if}
 				{/each}
 				{#each [...nodes.values()] as n (n.hash)}
