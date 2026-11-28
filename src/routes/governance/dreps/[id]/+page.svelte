@@ -1,4 +1,6 @@
 <script lang="ts">
+	import PoolDelegators from '$lib/indexdb/PoolDelegators.svelte';
+	import { indexEnabled } from '$lib/indexdb/config';
 	import Users from '@lucide/svelte/icons/users';
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
 	import ShieldAlert from '@lucide/svelte/icons/shield-alert';
@@ -29,6 +31,9 @@
 	 * how it voted, and how often it agreed with the outcome and with the SPOs' and the committee's majority.
 	 */
 	const id = $derived((page.params.id ?? '').toLowerCase());
+	// delegators joining / leaving (SQLite deleg index), when the indexes are on and published
+	let indexed = $state(false);
+	if (indexEnabled()) import('$lib/indexdb/service').then((s) => s.indexAvailable()).then((ok) => (indexed = ok));
 
 	const data = $derived.by(() => {
 		const key = id;
@@ -168,6 +173,8 @@
 			</Panel>
 		{/if}
 	{/await}
+
+	{#await data.drep then d}{#if indexed && d?.drep_id}<PoolDelegators drep={d.drep_id} />{/if}{/await}
 
 	<Panel title="Profile" sub="Self-declared by the DRep (CIP-119), fetched and hash-checked by the publish job" class="mb-6">
 		{#if !m}
