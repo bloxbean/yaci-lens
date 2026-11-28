@@ -14,6 +14,8 @@
 	import PoolName from '$lib/names/PoolName.svelte';
 	import TokenName from '$lib/names/TokenName.svelte';
 	import Cost from '$lib/indexdb/Cost.svelte';
+	import PrevNext from '$lib/ui/PrevNext.svelte';
+	import { keysetPages } from '$lib/ui/keyset.svelte';
 	import Gate from '$lib/indexdb/Gate.svelte';
 	import type { Activity, Cost as CostT, Measured, StakeAddress, StakeEvent, WalletSummary, Held, RewardRow, Withdrawal, Utxo } from '$lib/indexdb/service';
 	import { stakeAddressOf, bech32Decode } from '$lib/bech32';
@@ -61,42 +63,13 @@
 		return { x: w.months.map((m) => monthLabel(m.month)), vals };
 	}
 
-	// transactions (keyset pages)
-	let rows = $state<Activity[]>([]);
-	let cursor = $state<string | null>(null);
-	let done = $state(false);
-	let busy = $state(false);
-	let error = $state<string | null>(null);
-	let cost = $state<CostT | null>(null);
-	async function more(first = false) {
-		if (busy) return;
-		busy = true;
-		error = null;
-		try {
-			const s = await S();
-			const r = isStake ? await s.getStakeActivity(s.stakeCredential(id)!, first ? null : cursor) : await s.getAddressActivity(id, first ? null : cursor);
-			rows = first ? r.data.rows : [...rows, ...r.data.rows];
-			cursor = r.data.cursor;
-			done = !r.data.cursor;
-			cost = r.cost;
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		} finally {
-			busy = false;
-		}
-	}
-	let loadedTxs = '';
+	// transactions: pages of 25, newest first
+	const txs = keysetPages<Activity>(async (c) => {
+		const s = await S();
+		return isStake ? s.getStakeActivity(s.stakeCredential(id)!, c, 25) : s.getAddressActivity(id, c, 25);
+	});
 	$effect(() => {
-		const key = `${id}|${tab}`;
-		if (tab !== 'txs' || loadedTxs === id) return;
-		untrack(() => {
-			loadedTxs = id;
-			rows = [];
-			cursor = null;
-			done = false;
-			void more(true);
-		});
-		void key;
+		if (tab === 'txs' && txs.st.key !== id) untrack(() => txs.reset(id));
 	});
 
 	// tokens
@@ -106,39 +79,20 @@
 	const rewards = $derived(tab === 'rewards' && isStake ? S().then((s) => s.getRewards(id)) : null) as Promise<Measured<{ rewards: RewardRow[]; withdrawals: Withdrawal[] }>> | null;
 	const total = (r: RewardRow) => r.member + r.leader + r.other;
 
-	// UTxOs (keyset pages)
-	let utxos = $state<Utxo[]>([]);
-	let uCursor = $state<string | null>(null);
-	let uDone = $state(false);
-	let uBusy = $state(false);
-	let uCost = $state<CostT | null>(null);
-	let uErr = $state<string | null>(null);
-	async function moreUtxos(first = false) {
-		if (uBusy) return;
-		uBusy = true;
-		uErr = null;
-		try {
-			const r = await (await S()).getUtxos(isStake ? id : id, first ? null : uCursor);
-			utxos = first ? r.data.rows : [...utxos, ...r.data.rows];
-			uCursor = r.data.cursor;
-			uDone = !r.data.cursor;
-			uCost = r.cost;
-		} catch (e) {
-			uErr = e instanceof Error ? e.message : String(e);
-		} finally {
-			uBusy = false;
-		}
-	}
-	let loadedUtxos = '';
+	// UTxOs: pages of 50, newest first
+	const utx = keysetPages<Utxo>(async (c) => (await S()).getUtxos(id, c, 50));
 	$effect(() => {
-		if (tab !== 'utxos' || loadedUtxos === id) return;
-		untrack(() => {
-			loadedUtxos = id;
-			utxos = [];
-			uCursor = null;
-			uDone = false;
-			void moreUtxos(true);
-		});
+		if (tab === 'utxos' && utx.st.key !== id) untrack(() => utx.reset(id));
+	});
+
+	// client-side pages (lists read whole, capped): tokens held, a stake key's addresses
+	const SMALL_PAGE = 25;
+	let tokenPage = $state(0);
+	let addrPage = $state(0);
+	$effect(() => {
+		void id;
+		tokenPage = 0;
+		addrPage = 0;
 	});
 
 	// stake: delegation and addresses
@@ -197,16 +151,16 @@
 		{:catch e}<ErrorBox message={err(e)} />{/await}
 	{:else if tab === 'txs'}
 		<Panel title="Transactions" sub="newest first · lovelace received and sent by {isStake ? 'its addresses' : 'this address'}" flush>
-			{#snippet actions()}<Cost {cost} />{/snippet}
-			{#if error}<ErrorBox message={error} retry={() => more(rows.length === 0)} />{/if}
-			{#if !rows.length && busy}<Skeleton rows={8} />
-			{:else if !rows.length && !error}<div class="p-6 text-sm text-muted">No transactions in the published data.</div>
+			{#snippet actions()}<Cost cost={txs.st.cost} />{/snippet}
+			{#if txs.st.error}<ErrorBox message={txs.st.error} retry={() => txs.show(txs.st.page)} />{/if}
+			{#if !txs.st.rows.length && txs.st.busy}<Skeleton rows={8} />
+			{:else if !txs.st.rows.length && !txs.st.error}<div class="p-6 text-sm text-muted">No transactions in the published data.</div>
 			{:else}
-				<div class="overflow-x-auto">
+				<div class="overflow-x-auto {txs.st.busy ? 'opacity-60' : ''}">
 					<table class="w-full text-sm" data-testid="activity">
 						<thead class="text-left text-xs text-faint"><tr><th class="px-4 py-2">Time (UTC)</th><th>Transaction</th><th class="text-right">Received</th><th class="text-right">Sent</th><th class="px-4 text-right">Net ADA</th></tr></thead>
 						<tbody class="divide-y divide-line">
-							{#each rows as a (a.tx + a.slot)}
+							{#each txs.st.rows as a (a.tx + a.slot)}
 								<tr>
 									<td class="whitespace-nowrap px-4 py-2 font-mono text-xs text-muted">{time(a.slot)}</td>
 									<td><Hash value={a.tx} href="#/transactions/{a.tx}" /> <a class="text-xs text-faint hover:text-brand" href="#/x/graph/{a.tx}">graph</a>{#if a.invalid} <Badge tone="bad">failed</Badge>{/if}</td>
@@ -218,10 +172,7 @@
 						</tbody>
 					</table>
 				</div>
-				<div class="flex items-center justify-between border-t border-line px-4 py-3 text-xs text-muted">
-					<span>{rows.length} shown</span>
-					{#if !done}<button class="y-btn h-8 text-xs" onclick={() => more()} disabled={busy} data-testid="older">{busy ? 'Loading…' : 'Older'}</button>{:else}<span>end of history</span>{/if}
-				</div>
+				<PrevNext page={txs.st.page} size={25} shown={txs.st.rows.length} hasNext={!!txs.st.next} busy={txs.st.busy} onprev={() => txs.show(txs.st.page - 1)} onnext={() => txs.show(txs.st.page + 1)} />
 			{/if}
 		</Panel>
 	{:else if tab === 'tokens'}
@@ -235,13 +186,16 @@
 						<div class="p-6 text-sm text-muted">No native assets.</div>
 					{:else}
 						<ul class="divide-y divide-line text-sm" data-testid="tokens">
-							{#each t.data as h (h.unit)}
+							{#each t.data.slice(tokenPage * SMALL_PAGE, (tokenPage + 1) * SMALL_PAGE) as h (h.unit)}
 								<li class="flex items-center justify-between gap-3 px-4 py-2">
 									<a class="min-w-0 truncate" href="#/assets/unit/{h.unit}"><TokenName unit={h.unit} quantity={h.qty} /></a>
 									<span class="flex items-center gap-3 whitespace-nowrap text-xs text-faint">{h.utxos} UTxO{h.utxos === 1 ? '' : 's'} <a class="hover:text-brand" href="#/x/holders/{h.unit}">holders</a></span>
 								</li>
 							{/each}
 						</ul>
+						{#if t.data.length > SMALL_PAGE}
+							<PrevNext page={tokenPage} size={SMALL_PAGE} shown={t.data.slice(tokenPage * SMALL_PAGE, (tokenPage + 1) * SMALL_PAGE).length} total={t.data.length} hasNext={(tokenPage + 1) * SMALL_PAGE < t.data.length} onprev={() => tokenPage--} onnext={() => tokenPage++} />
+						{/if}
 					{/if}
 				</Panel>
 			{/if}
@@ -297,16 +251,16 @@
 		{:catch e}<ErrorBox message={err(e)} />{/await}
 	{:else if tab === 'utxos'}
 		<Panel title="Unspent outputs" sub="at the published tip, newest first" flush>
-			{#snippet actions()}<Cost cost={uCost} />{/snippet}
-			{#if uErr}<ErrorBox message={uErr} retry={() => moreUtxos(true)} />{/if}
-			{#if !utxos.length && uBusy}<Skeleton rows={6} />
-			{:else if !utxos.length && !uErr}<div class="p-6 text-sm text-muted">No unspent outputs.</div>
+			{#snippet actions()}<Cost cost={utx.st.cost} />{/snippet}
+			{#if utx.st.error}<ErrorBox message={utx.st.error} retry={() => utx.show(utx.st.page)} />{/if}
+			{#if !utx.st.rows.length && utx.st.busy}<Skeleton rows={6} />
+			{:else if !utx.st.rows.length && !utx.st.error}<div class="p-6 text-sm text-muted">No unspent outputs.</div>
 			{:else}
-				<div class="overflow-x-auto">
+				<div class="overflow-x-auto {utx.st.busy ? 'opacity-60' : ''}">
 					<table class="w-full text-sm" data-testid="utxos">
 						<thead class="text-left text-xs text-faint"><tr><th class="px-4 py-2">Created (UTC)</th><th>Output</th>{#if isStake}<th>Address</th>{/if}<th class="text-right">ADA</th><th class="px-4 text-right">Assets</th></tr></thead>
 						<tbody class="divide-y divide-line">
-							{#each utxos as u (u.tx + u.idx)}
+							{#each utx.st.rows as u (u.tx + u.idx)}
 								<tr>
 									<td class="whitespace-nowrap px-4 py-1.5 font-mono text-xs text-muted">{time(u.slot)}</td>
 									<td><Hash value={u.tx} href="#/transactions/{u.tx}" head={8} tail={4} /><span class="font-mono text-xs text-faint">#{u.idx}</span>{#if u.datum} <Badge tone="violet">datum</Badge>{/if}</td>
@@ -318,10 +272,7 @@
 						</tbody>
 					</table>
 				</div>
-				<div class="flex items-center justify-between border-t border-line px-4 py-3 text-xs text-muted">
-					<span>{utxos.length} shown · {ada(utxos.reduce((a, u) => a + u.lovelace, 0))} ₳</span>
-					{#if !uDone}<button class="y-btn h-8 text-xs" onclick={() => moreUtxos()} disabled={uBusy}>{uBusy ? 'Loading…' : 'More'}</button>{/if}
-				</div>
+				<PrevNext page={utx.st.page} size={50} shown={utx.st.rows.length} hasNext={!!utx.st.next} busy={utx.st.busy} onprev={() => utx.show(utx.st.page - 1)} onnext={() => utx.show(utx.st.page + 1)} />
 			{/if}
 		</Panel>
 	{:else if tab === 'delegation'}
@@ -358,13 +309,16 @@
 				<Panel title="Addresses with this stake credential" sub="{a.data.length} addresses (the explicit on-chain relation)" flush>
 					{#snippet actions()}<Cost cost={a.cost} />{/snippet}
 					<ul class="divide-y divide-line text-sm" data-testid="stake-addrs">
-						{#each a.data as x (x.address)}
+						{#each a.data.slice(addrPage * SMALL_PAGE, (addrPage + 1) * SMALL_PAGE) as x (x.address)}
 							<li class="flex items-center justify-between gap-3 px-4 py-2">
 								<Hash value={x.address} href="#/x/address/{x.address}" head={16} tail={8} />
 								<span class="whitespace-nowrap text-xs text-faint">{int(x.outputs)} outputs · last {time(x.lastSlot).slice(0, 10)}</span>
 							</li>
 						{/each}
 					</ul>
+					{#if a.data.length > SMALL_PAGE}
+						<PrevNext page={addrPage} size={SMALL_PAGE} shown={a.data.slice(addrPage * SMALL_PAGE, (addrPage + 1) * SMALL_PAGE).length} total={a.data.length} hasNext={(addrPage + 1) * SMALL_PAGE < a.data.length} onprev={() => addrPage--} onnext={() => addrPage++} />
+					{/if}
 				</Panel>
 			{/if}
 		{:catch e}<ErrorBox message={err(e)} />{/await}

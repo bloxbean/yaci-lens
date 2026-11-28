@@ -13,6 +13,8 @@
 	import SeriesChart from '$lib/charts/SeriesChart.svelte';
 	import { adaCompact } from '$lib/format';
 	import Cost from '$lib/indexdb/Cost.svelte';
+	import PrevNext from '$lib/ui/PrevNext.svelte';
+	import { keysetPages } from '$lib/ui/keyset.svelte';
 	import Gate from '$lib/indexdb/Gate.svelte';
 	import type { Cost as CostT, ScriptOutput, ScriptRun } from '$lib/indexdb/service';
 	import { live } from '$lib/lake/lake.svelte';
@@ -32,29 +34,7 @@
 	const time = (slot: number) => (svc ? svc.slotTime(slot).toISOString().slice(0, 16).replace('T', ' ') : int(slot));
 	const day = (slot: number) => (svc ? svc.slotDay(slot) : '');
 
-	function pager<T extends { slot: number; tx: string }>(fetch: (s: typeof import('$lib/indexdb/service'), cursor: string | null) => Promise<{ data: { rows: T[]; cursor: string | null }; cost: CostT }>) {
-		const st = $state({ rows: [] as T[], cursor: null as string | null, done: false, busy: false, error: null as string | null, cost: null as CostT | null });
-		return {
-			st,
-			async more(first = false) {
-				if (st.busy) return;
-				st.busy = true;
-				st.error = null;
-				try {
-					svc ??= await import('$lib/indexdb/service');
-					const r = await fetch(svc, first ? null : st.cursor);
-					st.rows = first ? r.data.rows : [...st.rows, ...r.data.rows];
-					st.cursor = r.data.cursor;
-					st.done = !r.data.cursor;
-					st.cost = r.cost;
-				} catch (e) {
-					st.error = e instanceof Error ? e.message : String(e);
-				} finally {
-					st.busy = false;
-				}
-			}
-		};
-	}
+	const S = async () => (svc ??= await import('$lib/indexdb/service'));
 
 	// value locked at the script's address over time (outputs locked minus spent, per day)
 	const tvl = $derived(/^[0-9a-f]{56}$/.test(hash) ? import('$lib/indexdb/service').then((s) => s.getScriptDays(hash)) : null);
@@ -63,8 +43,9 @@
 		return days.map((d) => (run += d.adaIn - d.adaOut) / 1e6);
 	}
 
-	const runs = pager<ScriptRun>((s, c) => s.getScriptActivity(hash, c));
-	const outs = pager<ScriptOutput>((s, c) => s.getScriptOutputs(hash, c));
+	// executions and state outputs: pages of 25, newest first
+	const runs = keysetPages<ScriptRun>(async (c) => (await S()).getScriptActivity(hash, c, 25));
+	const outs = keysetPages<ScriptOutput>(async (c) => (await S()).getScriptOutputs(hash, c, 25));
 	// what spent each listed output: loaded after the table shows (one indexed lookup per output, in parallel)
 	let spent = $state(new Map<string, string | null>());
 	let spentCost = $state<CostT | null>(null);
@@ -83,8 +64,8 @@
 	$effect(() => {
 		hash;
 		untrack(() => {
-			void runs.more(true);
-			void outs.more(true);
+			void runs.reset(hash);
+			void outs.reset(hash);
 		});
 	});
 
@@ -139,7 +120,7 @@
 		<div class="grid gap-6 xl:grid-cols-2">
 			<Panel title="Executions" sub="redeemers, newest first" flush>
 				{#snippet actions()}<Cost cost={runs.st.cost} />{/snippet}
-				{#if runs.st.error}<ErrorBox message={runs.st.error} retry={() => runs.more(true)} />{/if}
+				{#if runs.st.error}<ErrorBox message={runs.st.error} retry={() => runs.show(runs.st.page)} />{/if}
 				{#if !runs.st.rows.length && runs.st.busy}<Skeleton rows={8} />
 				{:else if !runs.st.rows.length}<div class="p-6 text-sm text-muted">No executions in the published data.</div>
 				{:else}
@@ -157,13 +138,13 @@
 							{/each}
 						</tbody>
 					</table>
-					<div class="flex justify-end border-t border-line px-4 py-3">{#if !runs.st.done}<button class="y-btn h-8 text-xs" onclick={() => runs.more()} disabled={runs.st.busy}>Older</button>{/if}</div>
+					<PrevNext page={runs.st.page} size={25} shown={runs.st.rows.length} hasNext={!!runs.st.next} busy={runs.st.busy} onprev={() => runs.show(runs.st.page - 1)} onnext={() => runs.show(runs.st.page + 1)} />
 				{/if}
 			</Panel>
 
 			<Panel title="State: outputs at the script address" sub="newest first, with datum and the transaction that spent each" flush>
 				{#snippet actions()}<Cost cost={outs.st.cost} />{#if spentCost}<span class="text-xs text-faint">spent:</span><Cost cost={spentCost} />{/if}{/snippet}
-				{#if outs.st.error}<ErrorBox message={outs.st.error} retry={() => outs.more(true)} />{/if}
+				{#if outs.st.error}<ErrorBox message={outs.st.error} retry={() => outs.show(outs.st.page)} />{/if}
 				{#if !outs.st.rows.length && outs.st.busy}<Skeleton rows={8} />
 				{:else if !outs.st.rows.length}<div class="p-6 text-sm text-muted">No outputs at this script's address in the published data.</div>
 				{:else}
@@ -188,7 +169,7 @@
 							{/each}
 						</tbody>
 					</table>
-					<div class="flex justify-end border-t border-line px-4 py-3">{#if !outs.st.done}<button class="y-btn h-8 text-xs" onclick={() => outs.more()} disabled={outs.st.busy}>Older</button>{/if}</div>
+					<PrevNext page={outs.st.page} size={25} shown={outs.st.rows.length} hasNext={!!outs.st.next} busy={outs.st.busy} onprev={() => outs.show(outs.st.page - 1)} onnext={() => outs.show(outs.st.page + 1)} />
 				{/if}
 			</Panel>
 		</div>
