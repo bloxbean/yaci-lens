@@ -73,9 +73,14 @@ const EXPERIMENTAL: NavGroup = {
 	items: [{ label: 'Indexed lookups', href: '/x', icon: Zap, keywords: 'sqlite index graph address stake holders search' }]
 };
 
-/** The navigation, with the experimental group when indexed lookups are on *and* the indexes are published. */
+/**
+ * The navigation with the experimental group, in builds that have indexes (VITE_LENS_INDEX_URL):
+ *  - turned off by the viewer: shown as "(off)", so the page that turns it back on is always one click away;
+ *  - on: shown when the indexes are published (the manifest loads), else hidden (there is nothing to use).
+ */
 export async function navGroups(): Promise<NavGroup[]> {
-	if (!INDEX_URL || !indexEnabled()) return NAV;
+	if (!INDEX_URL) return NAV;
+	if (!indexEnabled()) return [...NAV, { ...EXPERIMENTAL, items: EXPERIMENTAL.items.map((i) => ({ ...i, label: `${i.label} (off)` })) }];
 	const { indexAvailable } = await import('$lib/indexdb/service');
 	return (await indexAvailable()) ? [...NAV, EXPERIMENTAL] : NAV;
 }
