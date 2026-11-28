@@ -4,6 +4,7 @@
 	import { bech32Decode } from '$lib/bech32';
 	import { toasts } from '$lib/ui/toast.svelte';
 	import { summaryQuery } from '$lib/lake/lake.svelte';
+	import { indexEnabled } from '$lib/indexdb/config';
 
 	/*
 	 * Lookup box: block number, epoch ("e600"), transaction hash, governance action (hash#index), pool id
@@ -41,6 +42,8 @@
 		if (/^[0-9a-f]{56}$/i.test(s)) return void hash56(s.toLowerCase());
 		if (/^drep1[0-9a-z]+$/i.test(s) && bech32Decode(s)) return nav(`/governance/dreps/${s.toLowerCase()}`);
 		if (/^[0-9a-f]{64}$/i.test(s)) return nav(`/transactions/${s.toLowerCase()}`);
+		// EXPERIMENTAL indexed lookups: addresses and stake addresses have activity pages
+		if (indexEnabled() && (/^(addr|stake)(_test)?1[0-9a-z]{20,}$/i.test(s) || /^(Ae2|DdzFF)[1-9A-HJ-NP-Za-km-z]{20,}$/.test(s))) return nav(`/x/address/${s}`);
 		if (/^[\p{L}\p{N} ._$-]{2,40}$/u.test(s)) return nav(`/assets?q=${encodeURIComponent(s)}`);
 		toasts.show('Try a transaction hash, block number, epoch (e600), pool, DRep, script, policy or token name.', 'info', 5000);
 	}

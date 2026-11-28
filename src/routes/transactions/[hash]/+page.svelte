@@ -14,6 +14,9 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/ui/PageHeader.svelte';
+	import SpentBy from '$lib/indexdb/SpentBy.svelte';
+	import { indexEnabled } from '$lib/indexdb/config';
+	const indexed = indexEnabled();
 	import Panel from '$lib/ui/Panel.svelte';
 	import KV from '$lib/ui/KV.svelte';
 	import Hash from '$lib/ui/Hash.svelte';
@@ -266,6 +269,7 @@
 				{#if r.script_datahash}
 					<a class="y-btn h-8 text-xs" href="#/transactions/{txHash}/fork?date={date}" title="Change redeemers, datums, signers or outputs and re-run every script"><GitFork class="h-3.5 w-3.5" />Fork in the lab</a>
 				{/if}
+				{#if indexed}<a class="y-btn h-8 text-xs" href="#/x/graph/{txHash}" title="Transaction graph (experimental indexed lookup)">Graph</a>{/if}
 				<span class="flex">
 					<button class="y-icon-btn h-8 w-8" title="Previous transaction" aria-label="Previous transaction" onclick={() => step(r, date!, -1)}><ChevronLeft class="h-4 w-4" /></button>
 					<button class="y-icon-btn h-8 w-8" title="Next transaction" aria-label="Next transaction" onclick={() => step(r, date!, 1)}><ChevronRight class="h-4 w-4" /></button>
@@ -280,6 +284,8 @@
 			<span>{got.inputs.missingInputs.length} input(s) couldn't be resolved from the published data ({got.inputs.missingInputs.map((x) => shorten(x, 8, 6)).join(', ')}).</span>
 		</div>
 	{/if}
+
+	{#if indexed}<SpentBy hash={txHash} />{/if}
 
 	<div class="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
 		<Panel title="Overview">

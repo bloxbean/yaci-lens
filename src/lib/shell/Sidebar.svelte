@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { NAV, activeHref, href, routePath } from './nav';
+	import { navGroups, activeHref, href, routePath } from './nav';
+	const groups = navGroups();
 	import { shell } from './ui.svelte';
 	import Logo from './Logo.svelte';
 	import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';
@@ -24,7 +25,7 @@
 
 {#snippet links(compact: boolean)}
 	<nav class="flex flex-1 flex-col gap-4 overflow-y-auto px-3 py-3 [scrollbar-width:thin]" aria-label="Main">
-		{#each NAV as group (group.label)}
+		{#each groups as group (group.label)}
 			<div>
 				{#if !compact}<div class="y-label mb-1.5 px-2.5">{group.label}</div>{:else}<div class="mx-auto mb-2 h-px w-6 bg-line"></div>{/if}
 				<ul class="flex flex-col gap-0.5">
