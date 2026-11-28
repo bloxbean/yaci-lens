@@ -29,6 +29,26 @@ let sqlite3: any = null;
 let vfs: HttpVfs | null = null;
 const dbs = new Map<string, any>();
 
+/*
+ * A CDN with a cache rule answers the first range request for an object over its cache limit (Cloudflare: 512 MB) with
+ * the whole object (HTTP 200) while it tries to cache it. A synchronous XHR can't stop that download, so big files
+ * get one async probe first: on a 200 it is aborted at once (and the CDN then bypasses the object); on a second 200
+ * the file is refused. Publishers avoid it by uploading big files with Cache-Control: no-store.
+ */
+const BIG = 500_000_000;
+async function probe(url: string): Promise<void> {
+	for (let attempt = 0; attempt < 2; attempt++) {
+		const ctl = new AbortController();
+		const r = await fetch(url, { headers: { Range: 'bytes=0-0' }, signal: ctl.signal });
+		if (r.status === 206) {
+			await r.arrayBuffer();
+			return;
+		}
+		ctl.abort();
+	}
+	throw new Error(`${url} does not answer range requests (HTTP 200): not opened, it would download the whole file`);
+}
+
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 
 /** Parameters: strings "x'…'" become BLOBs (hex), other values bind as they are. */
@@ -55,6 +75,7 @@ async function handle(msg: Request): Promise<unknown> {
 		}
 		case 'open': {
 			if (dbs.has(msg.name)) return { ok: true };
+			if (msg.size > BIG) await probe(msg.url);
 			vfs!.register(msg.name, msg.url, msg.size);
 			const t0 = performance.now();
 			vfs!.resetStats();
