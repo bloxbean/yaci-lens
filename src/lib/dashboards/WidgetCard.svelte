@@ -1,15 +1,18 @@
 <script lang="ts" module>
 	import type { QueryResult } from '$lib/lake/db';
-	import { expandNow, runSql } from './run';
+	import { expandNow, expandParams, runKey, runWidget } from './run';
+	import type { Param, Widget as W } from './store.svelte';
 
-	// Results of this session, by SQL (10 minutes): re-rendering or editing a dashboard doesn't re-run its queries.
+	// Results of this session, by query and parameter values (10 minutes): re-rendering or editing a dashboard
+	// doesn't re-run its queries.
 	const cache = new Map<string, { at: number; p: Promise<QueryResult> }>();
-	export function cachedRun(sql: string, fresh = false): Promise<QueryResult> {
-		const c = cache.get(sql);
+	export function cachedRun(w: Pick<W, 'sql' | 'lookup'>, params: Param[] = [], fresh = false): Promise<QueryResult> {
+		const key = runKey(w, params);
+		const c = cache.get(key);
 		if (!fresh && c && Date.now() - c.at < 600_000) return c.p;
-		const p = runSql(sql);
-		cache.set(sql, { at: Date.now(), p });
-		p.catch(() => cache.delete(sql));
+		const p = runWidget(w, params);
+		cache.set(key, { at: Date.now(), p });
+		p.catch(() => cache.delete(key));
 		return p;
 	}
 </script>
@@ -29,17 +32,25 @@
 
 	let {
 		widget,
+		params = [],
 		editing = false,
 		onedit,
 		onremove,
 		onmove
-	}: { widget: Widget; editing?: boolean; onedit?: () => void; onremove?: () => void; onmove?: (dir: -1 | 1) => void } = $props();
+	}: { widget: Widget; params?: Param[]; editing?: boolean; onedit?: () => void; onremove?: () => void; onmove?: (dir: -1 | 1) => void } = $props();
 
 	let fresh = $state(0);
 	const result = $derived.by(() => {
 		const f = fresh;
-		return cachedRun(widget.sql, f > 0);
+		return cachedRun(widget, params, f > 0);
 	});
+	const lab = (sql: string) => {
+		try {
+			return expandNow(expandParams(sql, params));
+		} catch {
+			return expandNow(sql);
+		}
+	};
 	const span = $derived(widget.width === 3 ? 'xl:col-span-3 lg:col-span-2' : widget.width === 2 ? 'lg:col-span-2' : '');
 </script>
 
@@ -54,7 +65,8 @@
 			<button class="y-icon-btn h-7 w-7 hover:text-danger" title="Remove" aria-label="Remove widget" onclick={onremove}><Trash2 class="h-3.5 w-3.5" /></button>
 		{:else}
 			<button class="y-icon-btn h-7 w-7" title="Run again" aria-label="Run again" onclick={() => fresh++}><RotateCw class="h-3.5 w-3.5" /></button>
-			<a class="y-icon-btn h-7 w-7" title="Open in the SQL lab" aria-label="Open in the SQL lab" href={sqlHref(expandNow(widget.sql))}><TerminalSquare class="h-3.5 w-3.5" /></a>
+			{#if widget.lookup}<span class="y-pill border-cyan/25 bg-cyan/10 py-0 text-[10px] text-cyan" title="Indexed lookup (SQLite)">indexed</span>
+			{:else}<a class="y-icon-btn h-7 w-7" title="Open in the SQL lab" aria-label="Open in the SQL lab" href={sqlHref(lab(widget.sql))}><TerminalSquare class="h-3.5 w-3.5" /></a>{/if}
 		{/if}
 	</header>
 	<div class="flex-1 p-4">

@@ -13,7 +13,8 @@
 	import Skeleton from '$lib/ui/Skeleton.svelte';
 	import { copyText, toasts } from '$lib/ui/toast.svelte';
 	import { hashParam } from '$lib/lake/links';
-	import { dashboards, newId, shareParam, type Widget } from '$lib/dashboards/store.svelte';
+	import { dashboards, newId, shareParam, type Param, type ParamKind, type Widget } from '$lib/dashboards/store.svelte';
+	import { PARAM_KINDS, paramValue } from '$lib/dashboards/run';
 	import WidgetCard from '$lib/dashboards/WidgetCard.svelte';
 	import WidgetEditor from '$lib/dashboards/WidgetEditor.svelte';
 
@@ -23,6 +24,41 @@
 	const d = $derived(dashboards.get(id));
 
 	let editing = $state(hashParam('edit') === '1');
+
+	// Parameters: the dashboard's saved values, overridden by the link (#/dashboards/<id>?stake=stake1…); applying
+	// new values saves them.
+	let vals = $state<Record<string, string>>({});
+	let seededFor = '';
+	$effect(() => {
+		if (!d || seededFor === d.id) return;
+		seededFor = d.id;
+		vals = Object.fromEntries((d.params ?? []).map((p) => [p.name, hashParam(p.name) ?? p.value]));
+	});
+	const params = $derived<Param[]>((d?.params ?? []).map((p) => ({ ...p, value: vals[p.name] ?? p.value })));
+	let draft = $state<Record<string, string>>({});
+	$effect(() => {
+		draft = { ...vals };
+	});
+	async function applyParams() {
+		if (!d) return;
+		vals = { ...draft };
+		d.params = (d.params ?? []).map((p) => ({ ...p, value: vals[p.name] ?? p.value }));
+		await dashboards.save(d);
+	}
+	let newParam = $state<{ name: string; kind: ParamKind }>({ name: 'stake', kind: 'stake' });
+	async function addParam() {
+		if (!d) return;
+		const name = newParam.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+		if (!/^[a-z][a-z0-9_]*$/.test(name) || (d.params ?? []).some((p) => p.name === name)) return toasts.show('Use a new name: letters, digits and _.', 'error', 3000);
+		d.params = [...(d.params ?? []), { name, kind: newParam.kind, value: '' }];
+		vals = { ...vals, [name]: '' };
+		await dashboards.save(d);
+	}
+	async function removeParam(name: string) {
+		if (!d) return;
+		d.params = (d.params ?? []).filter((p) => p.name !== name);
+		await dashboards.save(d);
+	}
 	let editorFor = $state<Widget | 'new' | null>(null);
 	let confirmDelete = $state(false);
 
@@ -107,6 +143,28 @@
 		{/snippet}
 	</PageHeader>
 
+	{#if (d.params ?? []).length || editing}
+		<form class="y-panel mb-5 flex flex-wrap items-end gap-3 p-4" onsubmit={(e) => { e.preventDefault(); applyParams(); }} data-testid="params">
+			{#each d.params ?? [] as p (p.name)}
+				{@const k = PARAM_KINDS.find((x) => x.kind === p.kind)}
+				<label class="min-w-[18rem] flex-1 text-xs text-muted">
+					<span class="flex items-center gap-2">{p.name} <span class="text-faint">· {k?.label}</span>
+						{#if editing}<button type="button" class="ml-auto text-faint hover:text-danger" onclick={() => removeParam(p.name)} aria-label="Remove parameter">remove</button>{/if}
+					</span>
+					<input class="y-input mt-1 h-9 w-full font-mono text-xs {draft[p.name] && paramValue({ ...p, value: draft[p.name] }) == null ? 'border-danger/60' : ''}" bind:value={draft[p.name]} placeholder={k?.hint} data-testid="param-{p.name}" />
+				</label>
+			{/each}
+			{#if (d.params ?? []).length}<button class="y-btn y-btn-primary h-9" type="submit">Apply</button>{/if}
+			{#if editing}
+				<div class="flex items-end gap-2 text-xs text-muted">
+					<label>New parameter<input class="y-input mt-1 h-9 w-28" bind:value={newParam.name} /></label>
+					<select class="y-input h-9" bind:value={newParam.kind}>{#each PARAM_KINDS as k (k.kind)}<option value={k.kind}>{k.label}</option>{/each}</select>
+					<button class="y-btn h-9" type="button" onclick={addParam}><Plus class="h-4 w-4" />Add</button>
+				</div>
+			{/if}
+		</form>
+	{/if}
+
 	{#if !d.widgets.length}
 		<button class="y-panel flex w-full flex-col items-center gap-2 border-dashed p-10 text-center hover:border-brand/40" onclick={() => ((editing = true), (editorFor = 'new'))}>
 			<Plus class="h-6 w-6 text-brand" />
@@ -116,7 +174,7 @@
 	{:else}
 		<section class="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
 			{#each d.widgets as w, i (w.id)}
-				<WidgetCard widget={w} {editing} onedit={() => (editorFor = w)} onremove={() => remove(w)} onmove={(dir) => move(i, dir)} />
+				<WidgetCard widget={w} {params} {editing} onedit={() => (editorFor = w)} onremove={() => remove(w)} onmove={(dir) => move(i, dir)} />
 			{/each}
 		</section>
 	{/if}
@@ -134,6 +192,6 @@
 	{/if}
 
 	{#if editorFor}
-		<WidgetEditor widget={editorFor === 'new' ? null : editorFor} onsave={saveWidget} onclose={() => (editorFor = null)} />
+		<WidgetEditor widget={editorFor === 'new' ? null : editorFor} {params} onsave={saveWidget} onclose={() => (editorFor = null)} />
 	{/if}
 {/if}

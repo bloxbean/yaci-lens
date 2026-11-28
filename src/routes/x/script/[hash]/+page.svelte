@@ -10,6 +10,8 @@
 	import ErrorBox from '$lib/ui/ErrorBox.svelte';
 	import Skeleton from '$lib/ui/Skeleton.svelte';
 	import PlutusView from '$lib/ui/PlutusView.svelte';
+	import SeriesChart from '$lib/charts/SeriesChart.svelte';
+	import { adaCompact } from '$lib/format';
 	import Cost from '$lib/indexdb/Cost.svelte';
 	import Gate from '$lib/indexdb/Gate.svelte';
 	import type { Cost as CostT, ScriptOutput, ScriptRun } from '$lib/indexdb/service';
@@ -52,6 +54,13 @@
 				}
 			}
 		};
+	}
+
+	// value locked at the script's address over time (outputs locked minus spent, per day)
+	const tvl = $derived(/^[0-9a-f]{56}$/.test(hash) ? import('$lib/indexdb/service').then((s) => s.getScriptDays(hash)) : null);
+	function locked(days: import('$lib/indexdb/service').ScriptDay[]) {
+		let run = 0;
+		return days.map((d) => (run += d.adaIn - d.adaOut) / 1e6);
 	}
 
 	const runs = pager<ScriptRun>((s, c) => s.getScriptActivity(hash, c));
@@ -109,6 +118,24 @@
 	{#if !/^[0-9a-f]{56}$/.test(hash)}
 		<div class="y-panel p-6 text-sm text-muted">Not a script hash.</div>
 	{:else}
+		{#if tvl}
+			{#await tvl}
+				<div class="y-panel mb-6"><Skeleton rows={4} /></div>
+			{:then t}
+				{#if t.data.length}
+					{@const v = locked(t.data)}
+					<div class="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]" data-testid="script-tvl">
+						<Panel title="Value locked over time" sub="ADA in outputs at the script's address (locked - spent, per day) · now {adaCompact(v[v.length - 1] * 1e6)} ₳">
+							{#snippet actions()}<Cost cost={t.cost} />{/snippet}
+							<SeriesChart kind="area" x={t.data.map((d) => d.date)} series={[{ name: 'Locked (ADA)', values: v.map((x) => Math.max(0, x)) }]} format={(x) => adaCompact(x * 1e6)} label="Value locked" />
+						</Panel>
+						<Panel title="Outputs locked and spent per day" sub="last 90 active days">
+							<SeriesChart kind="bar" x={t.data.slice(-90).map((d) => d.date)} series={[{ name: 'Locked', values: t.data.slice(-90).map((d) => d.outsIn), slot: 1 }, { name: 'Spent', values: t.data.slice(-90).map((d) => d.outsOut), slot: 3 }]} label="Outputs per day" />
+						</Panel>
+					</div>
+				{/if}
+			{:catch}{/await}
+		{/if}
 		<div class="grid gap-6 xl:grid-cols-2">
 			<Panel title="Executions" sub="redeemers, newest first" flush>
 				{#snippet actions()}<Cost cost={runs.st.cost} />{/snippet}

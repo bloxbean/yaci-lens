@@ -17,10 +17,37 @@ export interface Viz {
 	format?: Format;
 }
 
+/** A dashboard input (e.g. "my stake address"): used in SQL as {$name} and by lookup widgets. */
+export type ParamKind = 'stake' | 'address' | 'pool' | 'script' | 'unit' | 'drep';
+export interface Param {
+	name: string;
+	kind: ParamKind;
+	value: string;
+}
+/** Widgets that read the SQLite indexes (experimental indexed lookups) instead of running SQL. */
+export type LookupKind =
+	| 'wallet-balance'
+	| 'wallet-history'
+	| 'wallet-flows'
+	| 'wallet-activity'
+	| 'tokens-held'
+	| 'utxos'
+	| 'rewards'
+	| 'delegation'
+	| 'pool-events'
+	| 'holders'
+	| 'script-tvl';
+export interface Lookup {
+	kind: LookupKind;
+	/** The dashboard parameter it reads. */
+	param: string;
+}
 export interface Widget {
 	id: string;
 	title: string;
 	sql: string;
+	/** Set: an indexed lookup (sql is ignored). */
+	lookup?: Lookup | null;
 	viz: Viz;
 	/** Columns of a 3-column grid. */
 	width: 1 | 2 | 3;
@@ -31,6 +58,8 @@ export interface Dashboard {
 	id: string;
 	name: string;
 	description: string;
+	/** Inputs shown above the widgets; a link can set them (#/dashboards/<id>?stake=stake1…). */
+	params?: Param[];
 	widgets: Widget[];
 	created: number;
 	updated: number;
@@ -164,9 +193,9 @@ class Dashboards {
 		await backend.put(d, $state.snapshot(this.list) as Dashboard[]);
 	}
 
-	async create(name: string, description = '', widgets: Widget[] = []): Promise<Dashboard> {
+	async create(name: string, description = '', widgets: Widget[] = [], params: Param[] = []): Promise<Dashboard> {
 		const now = Date.now();
-		const d: Dashboard = { id: newId(), name, description, widgets, created: now, updated: now };
+		const d: Dashboard = { id: newId(), name, description, widgets, created: now, updated: now, ...(params.length ? { params } : {}) };
 		await this.save(d);
 		return d;
 	}

@@ -10,6 +10,7 @@
 	import { toasts } from '$lib/ui/toast.svelte';
 	import { dashboards, newId } from '$lib/dashboards/store.svelte';
 	import { TEMPLATES } from '$lib/dashboards/templates';
+	import { indexEnabled } from '$lib/indexdb/config';
 
 	/*
 	 * Dashboard lab: personal dashboards made of SQL widgets, kept only in this browser. Start empty or from a
@@ -20,7 +21,7 @@
 	let fileInput: HTMLInputElement;
 
 	async function create(from?: (typeof TEMPLATES)[number]) {
-		const d = await dashboards.create(from?.name ?? (name.trim() || 'My dashboard'), from?.description ?? '', (from?.widgets ?? []).map((w) => ({ ...w, id: newId() })));
+		const d = await dashboards.create(from?.name ?? (name.trim() || 'My dashboard'), from?.description ?? '', (from?.widgets ?? []).map((w) => ({ ...w, id: newId() })), (from?.params ?? []).map((p) => ({ ...p })));
 		name = '';
 		goto(`#/dashboards/${d.id}${from ? '' : '?edit=1'}`);
 	}
@@ -95,7 +96,7 @@
 
 	<Panel title="Start from a template" sub="A copy is added to your dashboards; change anything">
 		<div class="grid gap-3 sm:grid-cols-2">
-			{#each TEMPLATES as t (t.id)}
+			{#each TEMPLATES.filter((t) => !t.indexed || indexEnabled()) as t (t.id)}
 				<button class="flex flex-col items-start gap-1.5 rounded-xl border border-line p-4 text-left transition hover:border-brand/40 hover:bg-surface-2/60" onclick={() => create(t)}>
 					<span class="font-display font-semibold">{t.name}</span>
 					<span class="text-xs text-muted">{t.description}</span>
