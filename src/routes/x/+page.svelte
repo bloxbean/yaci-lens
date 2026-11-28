@@ -87,8 +87,8 @@
 {:else if !enabled}
 	<div class="y-panel p-6 text-sm text-muted" data-testid="off">
 		Indexed lookups use SQLite-WASM to read small SQLite index files published next to the lake ({INDEX_URL}), with HTTP range
-		requests. They add a transaction graph, address and stake activity, script state, asset holders and a name search. Experimental:
-		turn it on to try it in this browser.
+		requests. They add a transaction graph, address and stake activity, script state, asset holders and a name search. You turned
+		them off in this browser; turn them on again to use them.
 	</div>
 {:else}
 	<Panel title="Look up" class="mb-6">

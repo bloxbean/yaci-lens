@@ -141,8 +141,12 @@ small **SQLite index files** published next to the lake (see the publisher's `SQ
 **SQLite-WASM over HTTP range requests**: a lookup reads a few 16 KB pieces of a remote B-tree, never a whole file.
 DuckDB-WASM stays the analytics engine and still reads the details from the lake.
 
-- Off unless the build sets `VITE_LENS_INDEX_URL` and the viewer turns it on (`#/x`, or `?exp=index` in a URL);
-  nothing of it loads otherwise. The worker (~230 KB) and the SQLite WASM (~860 KB) load on first use.
+- On when the build sets `VITE_LENS_INDEX_URL` and the indexes are published (the manifest loads); the viewer can
+  turn it off on `#/x`. Builds without the URL load none of it, and when the indexes can't be reached Lens works as
+  before. The worker (~230 KB) and the SQLite WASM (~860 KB) load on first use.
+- The top search box uses the indexes when they are there: transaction pages find their day through the SQLite
+  `tx` table (the Parquet tx index is the fallback), addresses and stake addresses open their activity, and free
+  text searches every name (pools, DReps, proposals, dApps, tokens) on `#/x/search`.
 - Pages: `#/x` (status, chain-point check, lookup), `#/x/graph/<tx>` (transaction graph), `#/x/address/<addr1…|stake1…>`
   (activity, a stake credential's addresses and certificates), `#/x/script/<hash>` (executions, state outputs and
   datums), `#/x/holders/<unit>` (holders at the tip), name search on `#/x`; a spent-by panel on transaction pages.
@@ -153,7 +157,7 @@ DuckDB-WASM stays the analytics engine and still reads the details from the lake
 - Benchmarks: `bench/` (Playwright) drives `#/x/bench`.
 
 ```bash
-VITE_LENS_INDEX_URL=https://data-test.bloxbean.org/mainnet/v1/indexes/ npm run dev   # then open #/x?exp=index
+VITE_LENS_INDEX_URL=https://data-test.bloxbean.org/mainnet/v1/indexes/ npm run dev   # then open #/x
 ```
 
 ## Make your own Yaci Lens, or contribute

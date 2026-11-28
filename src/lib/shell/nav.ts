@@ -73,9 +73,11 @@ const EXPERIMENTAL: NavGroup = {
 	items: [{ label: 'Indexed lookups', href: '/x', icon: Zap, keywords: 'sqlite index graph address stake holders search' }]
 };
 
-/** The navigation, with the experimental group when it is on. */
-export function navGroups(): NavGroup[] {
-	return INDEX_URL && indexEnabled() ? [...NAV, EXPERIMENTAL] : NAV;
+/** The navigation, with the experimental group when indexed lookups are on *and* the indexes are published. */
+export async function navGroups(): Promise<NavGroup[]> {
+	if (!INDEX_URL || !indexEnabled()) return NAV;
+	const { indexAvailable } = await import('$lib/indexdb/service');
+	return (await indexAvailable()) ? [...NAV, EXPERIMENTAL] : NAV;
 }
 
 export const ALL_PAGES: NavItem[] = [...NAV, ...(INDEX_URL ? [EXPERIMENTAL] : [])].flatMap((g) => g.items);

@@ -16,7 +16,9 @@
 	import PageHeader from '$lib/ui/PageHeader.svelte';
 	import SpentBy from '$lib/indexdb/SpentBy.svelte';
 	import { indexEnabled } from '$lib/indexdb/config';
-	const indexed = indexEnabled();
+	// indexed lookups: only when they are on and the indexes are published
+	let indexed = $state(false);
+	if (indexEnabled()) import('$lib/indexdb/service').then((s) => s.indexAvailable()).then((ok) => (indexed = ok));
 	import Panel from '$lib/ui/Panel.svelte';
 	import KV from '$lib/ui/KV.svelte';
 	import Hash from '$lib/ui/Hash.svelte';

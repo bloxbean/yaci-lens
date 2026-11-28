@@ -1,7 +1,8 @@
 /*
  * EXPERIMENTAL: indexed lookups with SQLite-WASM over published SQLite files (see yaci-lens-publisher's
- * SQLITE-INDEXES.md). Off unless the build sets VITE_LENS_INDEX_URL *and* the viewer turns the experiment on
- * (#/x, or any URL with ?exp=index). Production builds don't set the URL, so none of this code is loaded there.
+ * SQLITE-INDEXES.md). On when the build sets VITE_LENS_INDEX_URL, unless the viewer turned it off (#/x). Builds
+ * without the URL (production today) never load any of it. Pages that use the indexes also check that they are
+ * actually published (indexAvailable() in service.ts) and fall back to the lake otherwise.
  */
 
 const env = import.meta.env;
@@ -14,26 +15,26 @@ export const INDEX_URL: string = (() => {
 
 const KEY = 'lens:exp:index';
 
-function read(): boolean {
+/** '1' on, '0' turned off by the viewer, null: the default (on). */
+function read(): string | null {
 	try {
-		return localStorage.getItem(KEY) === '1';
+		return localStorage.getItem(KEY);
 	} catch {
-		return false;
+		return null;
 	}
 }
 
-/** Whether the experiment can run here (configured) and the viewer turned it on. */
+/** Whether indexed lookups can run here (configured) and the viewer has not turned them off. */
 export function indexEnabled(): boolean {
 	if (!INDEX_URL) return false;
 	if (typeof location !== 'undefined' && /[?&]exp=index\b/.test(location.hash)) setIndexEnabled(true);
-	return read();
+	return read() !== '0';
 }
 
 export function setIndexEnabled(on: boolean): void {
 	try {
-		if (on) localStorage.setItem(KEY, '1');
-		else localStorage.removeItem(KEY);
+		localStorage.setItem(KEY, on ? '1' : '0');
 	} catch {
-		/* private mode: the flag lasts for this page only */
+		/* private mode: the choice lasts for this page only */
 	}
 }

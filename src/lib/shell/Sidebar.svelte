@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { navGroups, activeHref, href, routePath } from './nav';
-	const groups = navGroups();
+	import { NAV, navGroups, activeHref, href, routePath } from './nav';
+	let groups = $state(NAV);
+	navGroups().then((g) => (groups = g));
 	import { shell } from './ui.svelte';
 	import Logo from './Logo.svelte';
 	import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';

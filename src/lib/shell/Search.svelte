@@ -42,10 +42,28 @@
 		if (/^[0-9a-f]{56}$/i.test(s)) return void hash56(s.toLowerCase());
 		if (/^drep1[0-9a-z]+$/i.test(s) && bech32Decode(s)) return nav(`/governance/dreps/${s.toLowerCase()}`);
 		if (/^[0-9a-f]{64}$/i.test(s)) return nav(`/transactions/${s.toLowerCase()}`);
-		// EXPERIMENTAL indexed lookups: addresses and stake addresses have activity pages
-		if (indexEnabled() && (/^(addr|stake)(_test)?1[0-9a-z]{20,}$/i.test(s) || /^(Ae2|DdzFF)[1-9A-HJ-NP-Za-km-z]{20,}$/.test(s))) return nav(`/x/address/${s}`);
-		if (/^[\p{L}\p{N} ._$-]{2,40}$/u.test(s)) return nav(`/assets?q=${encodeURIComponent(s)}`);
+		// EXPERIMENTAL indexed lookups (only when the indexes are published): addresses and stake addresses have
+		// activity pages, and free text searches every name (pools, DReps, proposals, dApps, tokens)
+		const isAddress = /^(addr|stake)(_test)?1[0-9a-z]{20,}$/i.test(s) || /^(Ae2|DdzFF)[1-9A-HJ-NP-Za-km-z]{20,}$/.test(s);
+		const isText = /^[\p{L}\p{N} ._$-]{2,40}$/u.test(s);
+		if ((isAddress || isText) && indexEnabled()) {
+			void indexed().then((ok) => {
+				if (ok) nav(isAddress ? `/x/address/${s}` : `/x/search?q=${encodeURIComponent(s)}`);
+				else if (isText) nav(`/assets?q=${encodeURIComponent(s)}`);
+				else toasts.show('Address lookups need the published indexes, which are not reachable.', 'info', 5000);
+			});
+			return;
+		}
+		if (isText) return nav(`/assets?q=${encodeURIComponent(s)}`);
 		toasts.show('Try a transaction hash, block number, epoch (e600), pool, DRep, script, policy or token name.', 'info', 5000);
+	}
+
+	async function indexed(): Promise<boolean> {
+		try {
+			return await (await import('$lib/indexdb/service')).indexAvailable();
+		} catch {
+			return false;
+		}
 	}
 
 	function nav(path: string) {
@@ -61,7 +79,7 @@
 		bind:this={input}
 		bind:value={q}
 		class="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-faint"
-		placeholder="Tx hash, block, epoch (e600), pool, DRep, script, token…"
+		placeholder={indexEnabled() ? 'Tx hash, address, stake key, block, epoch, pool, DRep, script, name…' : 'Tx hash, block, epoch (e600), pool, DRep, script, token…'}
 		aria-label="Search"
 	/>
 </form>

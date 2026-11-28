@@ -10,6 +10,7 @@ import type { PageTx } from '$lib/julc/replay/load';
 import type { StoreScriptRun, StoreUtxo } from '$lib/julc/replay/build';
 import { network } from './config';
 import { live, summary } from './lake.svelte';
+import { indexEnabled } from '$lib/indexdb/config';
 
 const HEX64 = /^[0-9a-f]{64}$/;
 
@@ -39,12 +40,33 @@ function indexFiles(): Promise<string[]> {
 export async function findTxDays(hashes: string[]): Promise<Map<string, string[]>> {
 	const want = [...new Set(hashes.map((h) => h.toLowerCase()).filter((h) => HEX64.test(h)))];
 	const out = new Map<string, string[]>();
-	const todo = want.filter((h) => {
+	let todo = want.filter((h) => {
 		const d = txDays.get(h);
 		if (d) out.set(h, [d]);
 		return !d;
 	});
 	if (!todo.length) return out;
+	// EXPERIMENTAL: the SQLite utxo index has every transaction by its full hash (slot -> day, no confirmation
+	// needed): ~0.2 s instead of seconds for the Parquet index. Only when the indexes are published; anything it
+	// doesn't find (or any failure) goes the Parquet way below.
+	if (indexEnabled()) {
+		try {
+			const svc = await import('$lib/indexdb/service');
+			if (await svc.indexAvailable()) {
+				const found = (await svc.txByHash(todo)).data;
+				for (const [h, t] of found) {
+					if (t.slot < 0) continue; // Byron genesis distributions: let the Parquet index give their day
+					const d = svc.slotDay(t.slot);
+					out.set(h, [d]);
+					txDays.set(h, d);
+				}
+				todo = todo.filter((h) => !txDays.has(h));
+				if (!todo.length) return out;
+			}
+		} catch (e) {
+			console.warn('[lens] indexed tx lookup failed, using the Parquet tx index', e);
+		}
+	}
 	const files = await indexFiles();
 	const keyOf = (h: string) => BigInt(`0x${h.slice(0, 16)}`).toString();
 	const byKey = new Map(todo.map((h) => [keyOf(h), h]));

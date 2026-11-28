@@ -70,6 +70,16 @@ export function manifest(): Promise<Manifest> {
 	return manifestP;
 }
 
+let available: Promise<boolean> | null = null;
+/** Whether the indexes are published and reachable (the manifest loads). Cached for the session. */
+export function indexAvailable(): Promise<boolean> {
+	available ??= manifest().then(
+		() => true,
+		() => false
+	);
+	return available;
+}
+
 interface Part {
 	part: FileEntry['part'];
 	shards: number;
