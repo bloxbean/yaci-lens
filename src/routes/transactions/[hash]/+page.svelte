@@ -14,11 +14,27 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import PageHeader from '$lib/ui/PageHeader.svelte';
-	import SpentBy from '$lib/indexdb/SpentBy.svelte';
 	import { indexEnabled } from '$lib/indexdb/config';
 	// indexed lookups: only when they are on and the indexes are published
 	let indexed = $state(false);
 	if (indexEnabled()) import('$lib/indexdb/service').then((s) => s.indexAvailable()).then((ok) => (indexed = ok));
+	// what spent each output (indexed): output index -> spending tx, null = unspent at the tip
+	let spentMap = $state<Map<number, string | null> | null>(null);
+	$effect(() => {
+		const h = txHash;
+		if (!indexed || !/^[0-9a-f]{64}$/.test(h)) return;
+		spentMap = null;
+		import('$lib/indexdb/service')
+			.then((s) => s.txLinks(h))
+			.then((r) => {
+				if (h !== txHash) return;
+				const m = new Map<number, string | null>();
+				for (const e of r.data.children) m.set(e.outIdx, e.byTx);
+				for (const i of r.data.unspent) m.set(i, null);
+				spentMap = m;
+			})
+			.catch(() => undefined);
+	});
 	import Panel from '$lib/ui/Panel.svelte';
 	import KV from '$lib/ui/KV.svelte';
 	import Hash from '$lib/ui/Hash.svelte';
@@ -287,8 +303,6 @@
 		</div>
 	{/if}
 
-	{#if indexed}<SpentBy hash={txHash} />{/if}
-
 	<div class="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
 		<Panel title="Overview">
 			{#snippet actions()}<SqlButton sql={`SELECT * FROM transaction WHERE date = DATE '${date}' AND tx_hash = '${txHash}'`} />{/snippet}
@@ -345,7 +359,7 @@
 			<div class="p-4 sm:p-5">
 				{#if shown === 'utxos'}
 					{#if got.inputs && got.outputs}
-						<UtxoFlow inputs={asUtxos(got.inputs.inputs)} outputs={asUtxos(got.outputs.outputs)} fee={r.fee} ondatum={(u) => (datumOf = u)} />
+						<UtxoFlow inputs={asUtxos(got.inputs.inputs)} outputs={asUtxos(got.outputs.outputs)} fee={r.fee} ondatum={(u) => (datumOf = u)} spent={spentMap} linkAddress={indexed} />
 					{:else}
 						<!-- Progressive: outputs (same day) usually arrive first; inputs need the tx index and the days they were created -->
 						<div class="grid gap-6 lg:grid-cols-2">
@@ -371,7 +385,7 @@
 								<div class="y-label mb-2.5">Outputs{got.outputs ? ` · ${got.outputs.outputs.length}` : ''}</div>
 								{#if got.outputs}
 									<div class="flex flex-col gap-2.5">
-										{#each asUtxos(got.outputs.outputs) as u (u.tx_hash + u.output_index)}<UtxoCard utxo={u} side="out" ondatum={(x) => (datumOf = x)} />{/each}
+										{#each asUtxos(got.outputs.outputs) as u (u.tx_hash + u.output_index)}<UtxoCard utxo={u} side="out" ondatum={(x) => (datumOf = x)} spentBy={spentMap ? spentMap.get(u.output_index) : undefined} linkAddress={indexed} />{/each}
 									</div>
 								{:else if got.errors.outputs}
 									{@render stageError(got.errors.outputs)}
@@ -483,7 +497,7 @@
 							<div class="y-label mb-2">Collateral inputs</div>
 							{#if got.inputs}
 								<div class="flex flex-col gap-2.5">
-									{#each asUtxos(got.inputs.collateralInputs) as u (u.tx_hash + u.output_index)}<UtxoCard utxo={u} side="in" />{/each}
+									{#each asUtxos(got.inputs.collateralInputs) as u (u.tx_hash + u.output_index)}<UtxoCard utxo={u} side="in"  linkAddress={indexed} />{/each}
 								</div>
 							{:else}
 								{@render loading('Resolving collateral inputs…')}
@@ -491,7 +505,7 @@
 						</div>
 						<div>
 							<div class="y-label mb-2">Collateral return</div>
-							{#if !got.outputs}<Skeleton rows={2} />{:else if got.outputs.collateralReturn}<UtxoCard utxo={got.outputs.collateralReturn as Utxo} side="out" />{:else}<p class="text-sm text-muted">None</p>{/if}
+							{#if !got.outputs}<Skeleton rows={2} />{:else if got.outputs.collateralReturn}<UtxoCard utxo={got.outputs.collateralReturn as Utxo} side="out"  linkAddress={indexed} />{:else}<p class="text-sm text-muted">None</p>{/if}
 							<p class="mt-3 text-xs text-muted">Collateral is only taken if a script fails. {r.invalid ? 'It failed, so it was.' : 'This transaction succeeded, so it was not.'}</p>
 						</div>
 					</div>

@@ -79,7 +79,13 @@
 		}
 	}
 
-	async function load(hash: string) {
+	/** Hide flows below this many ADA (dust, fee change). */
+	let minAda = $state(0);
+	let hops = $state(2);
+	let tracing = $state(false);
+	const big = (es: Edge[]) => es.reduce((a, e) => a + (e.lovelace ?? 0), 0) >= minAda * 1e6;
+
+	async function load(hash: string, auto = true) {
 		const n = nodes.get(hash);
 		if (!n || n.links || n.loading) return;
 		setNode(hash, { loading: true });
@@ -89,7 +95,7 @@
 			cost = r.cost;
 			total = { requests: total.requests + r.cost.requests, bytes: total.bytes + r.cost.bytes, ms: total.ms + r.cost.ms, queries: total.queries + r.cost.queries };
 			setNode(hash, { links: r.data, tx: r.data.tx, loading: false });
-			expand(hash, 'both');
+			if (auto) expand(hash, 'both');
 		} catch (e) {
 			setNode(hash, { loading: false });
 			error = e instanceof Error ? e.message : String(e);
@@ -103,18 +109,54 @@
 		let { shownP, shownC } = n;
 		if (side !== 'children') {
 			// group the inputs by the transaction that made them: one node per parent tx
-			const byTx = groupBy(n.links.parents, (e) => e.outTx);
+			const byTx = groupBy(n.links.parents, (e) => e.outTx).filter(([, es]) => big(es));
 			const next = byTx.slice(shownP, shownP + PER_SIDE);
 			for (const [tx, es] of next) if (place(tx, n.gen - 1)) es.forEach(addEdge);
 			shownP += next.length;
 		}
 		if (side !== 'parents') {
-			const byTx = groupBy(n.links.children, (e) => e.byTx);
+			const byTx = groupBy(n.links.children, (e) => e.byTx).filter(([, es]) => big(es));
 			const next = byTx.slice(shownC, shownC + PER_SIDE);
 			for (const [tx, es] of next) if (place(tx, n.gen + 1)) es.forEach(addEdge);
 			shownC += next.length;
 		}
 		setNode(hash, { shownP, shownC });
+	}
+
+	/**
+	 * Follow the money from the selected transaction: `hops` levels forward (who spent its outputs, and so on) or back
+	 * (where its inputs came from), the largest flows first, at most PER_SIDE per transaction, bounded by MAX_NODES.
+	 * Each level is loaded in parallel.
+	 */
+	async function trace(dir: 'forward' | 'back') {
+		if (!selected || tracing) return;
+		tracing = true;
+		let frontier = [selected];
+		const sum = (es: Edge[]) => es.reduce((a, e) => a + (e.lovelace ?? 0), 0);
+		try {
+			for (let d = 0; d < hops && frontier.length && nodes.size < MAX_NODES; d++) {
+				await Promise.all(frontier.map((h) => load(h, false)));
+				const next: string[] = [];
+				for (const h of frontier) {
+					const n = nodes.get(h);
+					if (!n?.links) continue;
+					const groups = (dir === 'forward' ? groupBy(n.links.children, (e) => e.byTx) : groupBy(n.links.parents, (e) => e.outTx))
+						.filter(([, es]) => big(es))
+						.sort((a, b) => sum(b[1]) - sum(a[1]))
+						.slice(0, PER_SIDE);
+					for (const [tx, es] of groups) {
+						if (place(tx, n.gen + (dir === 'forward' ? 1 : -1))) {
+							es.forEach(addEdge);
+							next.push(tx);
+						}
+					}
+					setNode(h, dir === 'forward' ? { shownC: Math.max(n.shownC, groups.length) } : { shownP: Math.max(n.shownP, groups.length) });
+				}
+				frontier = next;
+			}
+		} finally {
+			tracing = false;
+		}
 	}
 
 	function groupBy(es: Edge[], key: (e: Edge) => string): [string, Edge[]][] {
@@ -174,6 +216,14 @@
 		<div class="y-panel p-6 text-sm text-muted">Not a transaction hash.</div>
 	{:else}
 		{#if error}<ErrorBox message={error} retry={() => reset(root)} />{/if}
+		<div class="mb-3 flex flex-wrap items-center gap-2 text-xs" data-testid="graph-controls">
+			<span class="text-muted">Follow the money from the selected transaction:</span>
+			<button class="y-btn h-8 text-xs" disabled={tracing || !selected} onclick={() => trace('back')}>← where it came from</button>
+			<button class="y-btn h-8 text-xs" disabled={tracing || !selected} onclick={() => trace('forward')} data-testid="trace-forward">where it went →</button>
+			<label class="flex items-center gap-1 text-muted">hops <select class="rounded-md border border-line bg-surface px-1 py-0.5" bind:value={hops}>{#each [1, 2, 3, 4] as h (h)}<option value={h}>{h}</option>{/each}</select></label>
+			<label class="flex items-center gap-1 text-muted">hide below <input type="number" min="0" step="1" class="w-20 rounded-md border border-line bg-surface px-1.5 py-0.5" bind:value={minAda} /> ADA</label>
+			{#if tracing}<span class="text-brand">tracing…</span>{/if}
+		</div>
 		<div class="mb-3 flex flex-wrap items-center gap-3 text-xs text-muted">
 			<span>Click a transaction to load what it spent (left) and what spent its outputs (right). At most {PER_SIDE} per side at a time, {MAX_NODES} nodes.</span>
 			<span class="ml-auto flex items-center gap-2">last <Cost {cost} /> · total <Cost cost={total} /></span>
