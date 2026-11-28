@@ -3,6 +3,11 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import { page } from '$app/state';
 	import PageHeader from '$lib/ui/PageHeader.svelte';
+	import HoldersPanel from '$lib/indexdb/HoldersPanel.svelte';
+	import { indexEnabled } from '$lib/indexdb/config';
+	// holders come from the SQLite indexes, when they are on and published
+	let indexed = $state(false);
+	if (indexEnabled()) import('$lib/indexdb/service').then((s) => s.indexAvailable()).then((ok) => (indexed = ok));
 	import Panel from '$lib/ui/Panel.svelte';
 	import KV from '$lib/ui/KV.svelte';
 	import Hash from '$lib/ui/Hash.svelte';
@@ -138,6 +143,8 @@
 				</dl>
 			</div>
 		</section>
+
+		{#if indexed}<HoldersPanel {unit} {decimals} />{/if}
 
 		<section class="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
 			<Panel title="Policy activity" sub="Transactions with an output holding this policy's tokens, per day">

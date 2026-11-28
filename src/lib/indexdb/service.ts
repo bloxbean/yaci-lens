@@ -55,7 +55,7 @@ export interface Measured<T> {
 	cost: Cost;
 }
 
-export type DbName = 'utxo' | 'address' | 'stake' | 'script' | 'holders' | 'search';
+export type DbName = 'utxo' | 'address' | 'stake' | 'script' | 'holders' | 'search' | 'reward' | 'utxoset' | 'deleg';
 
 // ---- manifest and files ---------------------------------------------------------------------------------------------
 
@@ -574,8 +574,11 @@ export interface Holder {
 export async function getAssetHolders(unit: string, offset = 0, limit = 50): Promise<Measured<{ holders: Holder[]; count: number; total: string | null }>> {
 	const meter = new Meter();
 	const k = blob(unit.toLowerCase());
-	const [stat] = await runAll(meter, 'holders', `SELECT holders, total FROM unit_stat WHERE unit = ?`, [k]);
-	const rows = await runAll(meter, 'holders', `SELECT rank, holder, qty, utxos FROM holder WHERE unit = ? AND rank > ? ORDER BY rank LIMIT ${limit}`, [k, offset]);
+	const u = unit.toLowerCase();
+	const [[stat], rows] = await Promise.all([
+		runAll(meter, 'holders', `SELECT holders, total FROM unit_stat WHERE unit = ?`, [k], u),
+		runAll(meter, 'holders', `SELECT rank, holder, qty, utxos FROM holder WHERE unit = ? AND rank > ? ORDER BY rank LIMIT ${limit}`, [k, offset], u)
+	]);
 	return meter.done({
 		holders: rows.map((r) => ({ rank: Number(r.rank), holder: String(r.holder), qty: String(r.qty), utxos: Number(r.utxos) })),
 		count: stat ? Number(stat.holders) : 0,
@@ -611,6 +614,180 @@ export async function search(text: string, limit = 25): Promise<Measured<SearchH
 	if (!fts) return meter.done([]);
 	const rows = await runAll(meter, 'search', `SELECT d.kind, d.key, d.title, substr(d.body, 1, 160) AS body FROM doc_fts JOIN doc d ON d.id = doc_fts.rowid WHERE doc_fts MATCH ? ORDER BY rank LIMIT ${limit}`, [fts]);
 	return meter.done(rows.map((r) => ({ kind: r.kind as SearchHit['kind'], key: String(r.key), title: String(r.title), body: String(r.body ?? '') })));
+}
+
+// ---- wallet: balance and history, tokens held, rewards, UTxOs ------------------------------------------------------
+
+/** First 12 bytes of sha256(text): the key of addresses, stake addresses, holders and DRep ids in the indexes. */
+export const textKey = addressKey;
+
+export interface MonthRow {
+	/** YYYYMM (UTC) */
+	month: number;
+	recv: number;
+	sent: number;
+	txs: number;
+}
+export interface WalletSummary {
+	/** Lovelace held at the published tip (received - sent; for a stake key: over all its addresses, without rewards). */
+	balance: number;
+	recv: number;
+	sent: number;
+	txs: number;
+	months: MonthRow[];
+}
+
+function summarize(rows: Row[]): WalletSummary {
+	const by = new Map<number, MonthRow>();
+	for (const r of rows) {
+		const m = Number(r.month);
+		const prev = by.get(m) ?? { month: m, recv: 0, sent: 0, txs: 0 };
+		by.set(m, { month: m, recv: prev.recv + Number(r.recv), sent: prev.sent + Number(r.sent), txs: prev.txs + Number(r.txs) });
+	}
+	const months = [...by.values()].sort((a, b) => a.month - b.month);
+	const recv = months.reduce((a, m) => a + m.recv, 0);
+	const sent = months.reduce((a, m) => a + m.sent, 0);
+	return { balance: recv - sent, recv, sent, txs: months.reduce((a, m) => a + m.txs, 0), months };
+}
+
+/** Balance and monthly history of an address (one small read per part, even for very busy addresses). */
+export async function getAddressSummary(address: string): Promise<Measured<WalletSummary>> {
+	const meter = new Meter();
+	const k = await addressKey(address);
+	return meter.done(summarize(await runAll(meter, 'address', `SELECT month, recv, sent, txs FROM addr_month WHERE addr = ?`, [blob(k)], k)));
+}
+
+/** Balance and monthly history of a stake credential, over all its addresses (rewards are separate: getRewards). */
+export async function getStakeSummary(credential: string): Promise<Measured<WalletSummary>> {
+	const meter = new Meter();
+	return meter.done(summarize(await runAll(meter, 'stake', `SELECT month, recv, sent, txs FROM stake_month WHERE stake = ?`, [blob(credential)], credential)));
+}
+
+export interface Held {
+	unit: string;
+	qty: string;
+	utxos: number;
+}
+
+/** Native assets held at the tip by a holder: a stake address (for base addresses) or an address. */
+export async function getTokensHeld(holder: string, limit = 500): Promise<Measured<Held[]>> {
+	const meter = new Meter();
+	const k = await textKey(holder);
+	const rows = await runAll(meter, 'holders', `SELECT lower(hex(unit)) AS unit, qty, utxos FROM held WHERE k = ? LIMIT ${limit}`, [blob(k)], k);
+	return meter.done(rows.map((r) => ({ unit: String(r.unit), qty: String(r.qty), utxos: Number(r.utxos) })));
+}
+
+export interface RewardRow {
+	epoch: number;
+	member: number;
+	leader: number;
+	other: number;
+	pool: string | null;
+}
+export interface Withdrawal {
+	slot: number;
+	tx: string;
+	amount: number;
+}
+
+/** Rewards of a stake address, every epoch (earned for; spendable two epochs later), and its withdrawals. */
+export async function getRewards(stakeAddress: string): Promise<Measured<{ rewards: RewardRow[]; withdrawals: Withdrawal[] }>> {
+	const meter = new Meter();
+	const k = await textKey(stakeAddress);
+	const [rw, wd] = await Promise.all([
+		runAll(meter, 'reward', `SELECT epoch, member, leader, other, lower(hex(pool)) AS pool FROM reward WHERE k = ? ORDER BY epoch`, [blob(k)], k),
+		runAll(meter, 'reward', `SELECT slot, lower(hex(tx)) AS tx, amount FROM withdrawal WHERE k = ? ORDER BY slot`, [blob(k)], k)
+	]);
+	return meter.done({
+		rewards: rw.map((r) => ({ epoch: Number(r.epoch), member: Number(r.member), leader: Number(r.leader), other: Number(r.other), pool: (r.pool as string) || null })).sort((a, b) => a.epoch - b.epoch),
+		withdrawals: wd.map((r) => ({ slot: Number(r.slot), tx: String(r.tx), amount: Number(r.amount) })).sort((a, b) => a.slot - b.slot)
+	});
+}
+
+export interface Utxo {
+	slot: number;
+	tx: string;
+	idx: number;
+	addr?: string;
+	lovelace: number;
+	assets: number;
+	datum: boolean;
+}
+
+/** Unspent outputs at the tip of an address, or of every address of a stake address; newest first, paged. */
+export async function getUtxos(addressOrStake: string, cursor: string | null = null, limit = 50): Promise<Measured<Page<Utxo>>> {
+	const meter = new Meter();
+	const stake = /^stake(_test)?1/.test(addressOrStake);
+	const k = await textKey(addressOrStake);
+	const [cs, ct] = cursor ? cursor.split(':') : [null, null];
+	const where = cursor ? `AND (slot < ? OR (slot = ? AND tx < ?))` : '';
+	const params: Param[] = cursor ? [blob(k), Number(cs), Number(cs), blob(String(ct))] : [blob(k)];
+	const cols = `slot, lower(hex(tx)) AS tx, idx, ${stake ? 'addr, ' : ''}lovelace, assets, datum`;
+	const rows = await runAll(meter, 'utxoset', `SELECT ${cols} FROM ${stake ? 'stake_utxo' : 'addr_utxo'} WHERE k = ? ${where} ORDER BY slot DESC, tx DESC, idx LIMIT ${limit + 64}`, params, k);
+	const list: Utxo[] = rows.map((r) => ({ slot: Number(r.slot), tx: String(r.tx), idx: Number(r.idx), addr: (r.addr as string) ?? undefined, lovelace: Number(r.lovelace), assets: Number(r.assets), datum: Number(r.datum) === 1 }));
+	let end = Math.min(limit, list.length);
+	while (end > 0 && end < list.length && list[end].slot === list[end - 1].slot && list[end].tx === list[end - 1].tx) end++;
+	const page = list.slice(0, end);
+	const last = page[page.length - 1];
+	return meter.done({ rows: page, cursor: list.length > end && last ? `${last.slot}:${last.tx}` : null });
+}
+
+// ---- pools and DReps: delegators joining and leaving -----------------------------------------------------------
+
+export interface DelegEvent {
+	slot: number;
+	epoch: number | null;
+	stake: string;
+	kind: 'join' | 'leave';
+	/** join: the previous pool / DRep; leave: the next one (none: deregistered). */
+	other: string | null;
+}
+
+async function delegEvents(table: 'pool_event' | 'drep_event', keyCol: string, key: string, cursor: string | null, limit: number, otherHex: boolean): Promise<Measured<Page<DelegEvent>>> {
+	const meter = new Meter();
+	const [cs, cst] = cursor ? cursor.split('|') : [null, null];
+	const where = cursor ? `AND (slot < ? OR (slot = ? AND stake < ?))` : '';
+	const params: Param[] = cursor ? [blob(key), Number(cs), Number(cs), String(cst)] : [blob(key)];
+	const other = otherHex ? 'lower(hex(other))' : 'other';
+	const rows = await runAll(meter, 'deleg', `SELECT slot, epoch, stake, kind, ${other} AS other FROM ${table} WHERE ${keyCol} = ? ${where} ORDER BY slot DESC, stake DESC LIMIT ${limit + 1}`, params, key);
+	const list: DelegEvent[] = rows.map((r) => ({ slot: Number(r.slot), epoch: r.epoch == null ? null : Number(r.epoch), stake: String(r.stake), kind: r.kind as DelegEvent['kind'], other: (r.other as string) || null }));
+	const page = list.slice(0, limit);
+	const last = page[page.length - 1];
+	return meter.done({ rows: page, cursor: list.length > limit && last ? `${last.slot}|${last.stake}` : null });
+}
+
+/** Stake addresses that joined or left a pool (by delegation certificates), newest first. */
+export async function getPoolEvents(poolHash: string, cursor: string | null = null, limit = 50): Promise<Measured<Page<DelegEvent>>> {
+	return delegEvents('pool_event', 'pool', poolHash.toLowerCase(), cursor, limit, true);
+}
+
+/** Stake addresses that delegated their vote to a DRep (drep1… id, or the abstain / no-confidence option) or left it. */
+export async function getDrepEvents(drepId: string, cursor: string | null = null, limit = 50): Promise<Measured<Page<DelegEvent>>> {
+	return delegEvents('drep_event', 'k', await textKey(drepId), cursor, limit, false);
+}
+
+// ---- scripts: value locked over time ---------------------------------------------------------------------------
+
+export interface ScriptDay {
+	/** UTC day */
+	date: string;
+	adaIn: number;
+	adaOut: number;
+	outsIn: number;
+	outsOut: number;
+}
+
+/** Per day: lovelace and outputs locked at a script's address and spent from it (value locked = running sum). */
+export async function getScriptDays(scriptHash: string): Promise<Measured<ScriptDay[]>> {
+	const meter = new Meter();
+	const rows = await runAll(meter, 'script', `SELECT day, ada_in, ada_out, outs_in, outs_out FROM script_day WHERE script = ? ORDER BY day`, [blob(scriptHash)], scriptHash);
+	const by = new Map<number, ScriptDay>();
+	for (const r of rows) {
+		const d = Number(r.day);
+		const p = by.get(d) ?? { date: new Date(d * 86_400_000).toISOString().slice(0, 10), adaIn: 0, adaOut: 0, outsIn: 0, outsOut: 0 };
+		by.set(d, { ...p, adaIn: p.adaIn + Number(r.ada_in), adaOut: p.adaOut + Number(r.ada_out), outsIn: p.outsIn + Number(r.outs_in), outsOut: p.outsOut + Number(r.outs_out) });
+	}
+	return meter.done([...by.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v));
 }
 
 // ---- generic --------------------------------------------------------------------------------------------------------
