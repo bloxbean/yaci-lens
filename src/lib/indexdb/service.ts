@@ -347,14 +347,17 @@ async function activity(db: DbName, table: string, keyCol: string, key: string, 
 	const [cs, ct] = cursor ? cursor.split(':') : [null, null];
 	const where = cursor ? `AND (slot < ? OR (slot = ? AND tx < ?))` : '';
 	const params: Param[] = cursor ? [blob(key), Number(cs), Number(cs), blob(String(ct))] : [blob(key)];
-	const rows: Activity[] = [];
-	// newest part first; stop as soon as the page is full
-	for (const p of await parts(db)) {
-		const need = limit + 1 - rows.length;
-		if (need <= 0) break;
-		const rs = await run(meter, await open(fileFor(p, key)), `SELECT slot, lower(hex(tx)) AS tx, recv, sent, flags FROM ${table} WHERE ${keyCol} = ? ${where} ORDER BY slot DESC, tx DESC LIMIT ${need}`, params);
-		rows.push(...rs.map((r) => ({ slot: Number(r.slot), tx: String(r.tx), recv: Number(r.recv), sent: Number(r.sent), invalid: (Number(r.flags) & 1) === 1 })));
-	}
+	// every part in parallel (one round trip instead of one per part), then merged newest first
+	const ps = await parts(db);
+	const got = await Promise.all(
+		ps.map(async (p, i) =>
+			run(meter, await open(fileFor(p, key)), `SELECT slot, lower(hex(tx)) AS tx, recv, sent, flags FROM ${table} WHERE ${keyCol} = ? ${where} ORDER BY slot DESC, tx DESC LIMIT ${limit + 1}`, params, i)
+		)
+	);
+	const rows: Activity[] = got
+		.flat()
+		.map((r) => ({ slot: Number(r.slot), tx: String(r.tx), recv: Number(r.recv), sent: Number(r.sent), invalid: (Number(r.flags) & 1) === 1 }))
+		.sort((a, b) => b.slot - a.slot || (a.tx < b.tx ? 1 : a.tx > b.tx ? -1 : 0));
 	const more = rows.length > limit;
 	const page = rows.slice(0, limit);
 	return { rows: page, cursor: more ? cursorOf(page[page.length - 1]) : null };
@@ -440,16 +443,17 @@ async function keyset<T extends { slot: number; tx: string }>(
 	const [cs, ct] = cursor ? cursor.split(':') : [null, null];
 	const where = cursor ? `AND (slot < ? OR (slot = ? AND tx < ?))` : '';
 	const params: Param[] = cursor ? [blob(key), Number(cs), Number(cs), blob(String(ct))] : [blob(key)];
-	const rows: T[] = [];
-	for (const p of await parts(db)) {
-		const need = limit + 1 - rows.length;
-		if (need <= 0) break;
-		rows.push(...(await run(meter, await open(fileFor(p, key)), `SELECT ${cols} FROM ${table} WHERE script = ? ${where} ORDER BY slot DESC, tx DESC LIMIT ${need}`, params)).map(map));
-	}
-	const more = rows.length > limit;
-	const page = rows.slice(0, limit);
+	const ps = await parts(db);
+	const got = await Promise.all(
+		ps.map(async (p, i) => (await run(meter, await open(fileFor(p, key)), `SELECT ${cols} FROM ${table} WHERE script = ? ${where} ORDER BY slot DESC, tx DESC LIMIT ${limit + 32}`, params, i)).map(map))
+	);
+	const rows: T[] = got.flat().sort((a, b) => b.slot - a.slot || (a.tx < b.tx ? 1 : a.tx > b.tx ? -1 : 0));
+	// a page ends on a whole transaction (several redeemers or outputs can share one), so the cursor loses nothing
+	let end = Math.min(limit, rows.length);
+	while (end > 0 && end < rows.length && rows[end].slot === rows[end - 1].slot && rows[end].tx === rows[end - 1].tx) end++;
+	const page = rows.slice(0, end);
 	const last = page[page.length - 1];
-	return { rows: page, cursor: more && last ? `${last.slot}:${last.tx}` : null };
+	return { rows: page, cursor: rows.length > end && last ? `${last.slot}:${last.tx}` : null };
 }
 
 /** A script's executions (redeemers), newest first; each can be opened in the julc debugger. */

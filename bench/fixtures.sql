@@ -1,6 +1,7 @@
 -- Picks benchmark keys from the published lake, so no addresses are kept in the repo.
 -- duckdb -json -c "$(sed "s/{DAY}/2026-11-20/g; s#{CATALOG}#https://data-test.bloxbean.org/mainnet/v1/catalog.ducklake#g; s#{SUMMARY}#https://data-test.bloxbean.org/mainnet/v1/summary/#g" fixtures.sql)" | node to-fixtures.mjs > fixtures.json
 INSTALL httpfs; LOAD httpfs; INSTALL ducklake; LOAD ducklake;
+SET memory_limit = '2GB'; SET threads = 4;
 ATTACH '{CATALOG}' AS l (TYPE ducklake, READ_ONLY);
 WITH s AS (
   SELECT i.tx_hash, i.output_index, i.spent_tx_hash, o.owner_addr, o.owner_stake_addr
