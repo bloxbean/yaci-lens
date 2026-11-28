@@ -135,6 +135,23 @@ async function run(meter: Meter, file: string, sql: string, params: Param[] = []
 	return r.rows.map((row) => Object.fromEntries(r.columns.map((c, i) => [c, row[i]])));
 }
 
+/**
+ * Snapshot dbs (holders, utxoset): the base of the month's tip state (history part, or a single "current" file in
+ * older layouts) and the changes since (recent part). Returns the file names holding `keyHex`, null when absent.
+ */
+async function snapshotFiles(db: DbName, keyHex: string): Promise<{ base: string | null; recent: string | null }> {
+	const ps = await parts(db);
+	const b = ps.find((p) => p.part === 'history' || p.part === 'current');
+	const r = ps.find((p) => p.part === 'recent');
+	return { base: b ? await open(fileFor(b, keyHex)) : null, recent: r ? await open(fileFor(r, keyHex)) : null };
+}
+
+/** Largest first, by exact integer quantity. */
+const byQty = (a: { qty: string }, b: { qty: string }) => {
+	const x = BigInt(a.qty), y = BigInt(b.qty);
+	return x > y ? -1 : x < y ? 1 : 0;
+};
+
 /** A query for one key on every part of a db (newest first; the key's shard in sharded parts), rows tagged with the part. */
 async function runAll(meter: Meter, db: DbName, sql: string, params: Param[] = [], keyHex = ''): Promise<Row[]> {
 	// the parts in parallel, one lane each; results newest part first
@@ -573,17 +590,43 @@ export interface Holder {
 /** The largest holders of a native asset at the published tip (by stake credential, else address). */
 export async function getAssetHolders(unit: string, offset = 0, limit = 50): Promise<Measured<{ holders: Holder[]; count: number; total: string | null }>> {
 	const meter = new Meter();
-	const k = blob(unit.toLowerCase());
 	const u = unit.toLowerCase();
-	const [[stat], rows] = await Promise.all([
-		runAll(meter, 'holders', `SELECT holders, total FROM unit_stat WHERE unit = ?`, [k], u),
-		runAll(meter, 'holders', `SELECT rank, holder, qty, utxos FROM holder WHERE unit = ? AND rank > ? ORDER BY rank LIMIT ${limit}`, [k, offset], u)
+	const k = blob(u);
+	const f = await snapshotFiles('holders', u);
+	const base = f.base;
+	if (!base) return meter.done({ holders: [], count: 0, total: null });
+	// counts: the current ones when the unit changed since the base
+	const [[bstat], [nstat]] = await Promise.all([
+		run(meter, base, `SELECT holders, total FROM unit_stat WHERE unit = ?`, [k], 0),
+		f.recent ? run(meter, f.recent, `SELECT holders, total FROM unit_stat_now WHERE unit = ?`, [k], 1) : Promise.resolve([] as Row[])
 	]);
-	return meter.done({
-		holders: rows.map((r) => ({ rank: Number(r.rank), holder: String(r.holder), qty: String(r.qty), utxos: Number(r.utxos) })),
-		count: stat ? Number(stat.holders) : 0,
-		total: stat ? String(stat.total) : null
-	});
+	const stat = nstat ?? bstat;
+	const out = (holders: Holder[]) => meter.done({ holders, count: stat ? Number(stat.holders) : 0, total: stat ? String(stat.total) : null });
+	const toH = (r: Row, rank: number): Holder => ({ rank, holder: String(r.holder), qty: String(r.qty), utxos: Number(r.utxos) });
+	if (!nstat) {
+		// unchanged since the base: its ranking is current
+		const rows = await run(meter, base, `SELECT rank, holder, qty, utxos FROM holder WHERE unit = ? AND rank > ? ORDER BY rank LIMIT ${limit}`, [k, offset], 0);
+		return out(rows.map((r) => toH(r, Number(r.rank))));
+	}
+	// changed: merge the base's leaders (with their current amounts) and the largest changed holdings, then re-rank.
+	// Exact for any holder in the top N: either unchanged and among the base's top 2N + 50, or changed and among the
+	// largest changed holdings.
+	const n = offset + limit;
+	const [top, changedTop] = await Promise.all([
+		run(meter, base, `SELECT holder, qty, utxos FROM holder WHERE unit = ? AND rank <= ? ORDER BY rank`, [k, 2 * n + 50], 0),
+		run(meter, f.recent!, `SELECT holder, qty, utxos FROM holder_rank WHERE unit = ? ORDER BY nq LIMIT ${n + 50}`, [k], 1)
+	]);
+	const now = new Map<string, Row>();
+	for (let i = 0; i < top.length; i += 200) {
+		const hs = top.slice(i, i + 200).map((r) => String(r.holder));
+		const rs = await run(meter, f.recent!, `SELECT holder, qty, utxos FROM holder_now WHERE unit = ? AND holder IN (${hs.map(() => '?').join(',')})`, [k, ...hs], 1);
+		for (const r of rs) now.set(String(r.holder), r);
+	}
+	const merged = new Map<string, Row>();
+	for (const r of top) merged.set(String(r.holder), now.get(String(r.holder)) ?? r);
+	for (const r of changedTop) merged.set(String(r.holder), r);
+	const list = [...merged.values()].filter((r) => String(r.qty) !== '0').map((r) => toH(r, 0)).sort(byQty);
+	return out(list.slice(offset, offset + limit).map((h, i) => ({ ...h, rank: offset + i + 1 })));
 }
 
 // ---- full-text search -------------------------------------------------------------------------------------------------
@@ -673,8 +716,16 @@ export interface Held {
 export async function getTokensHeld(holder: string, limit = 500): Promise<Measured<Held[]>> {
 	const meter = new Meter();
 	const k = await textKey(holder);
-	const rows = await runAll(meter, 'holders', `SELECT lower(hex(unit)) AS unit, qty, utxos FROM held WHERE k = ? LIMIT ${limit}`, [blob(k)], k);
-	return meter.done(rows.map((r) => ({ unit: String(r.unit), qty: String(r.qty), utxos: Number(r.utxos) })));
+	const f = await snapshotFiles('holders', k);
+	const [base, changed] = await Promise.all([
+		f.base ? run(meter, f.base, `SELECT lower(hex(unit)) AS unit, qty, utxos FROM held WHERE k = ? LIMIT ${limit}`, [blob(k)], 0) : Promise.resolve([] as Row[]),
+		f.recent ? run(meter, f.recent, `SELECT lower(hex(unit)) AS unit, qty, utxos FROM held_now WHERE k = ?`, [blob(k)], 1) : Promise.resolve([] as Row[])
+	]);
+	const by = new Map<string, Row>();
+	for (const r of base) by.set(String(r.unit), r);
+	for (const r of changed) by.set(String(r.unit), r);
+	const list = [...by.values()].filter((r) => String(r.qty) !== '0').map((r) => ({ unit: String(r.unit), qty: String(r.qty), utxos: Number(r.utxos) }));
+	return meter.done(list.slice(0, limit));
 }
 
 export interface RewardRow {
@@ -719,12 +770,22 @@ export async function getUtxos(addressOrStake: string, cursor: string | null = n
 	const meter = new Meter();
 	const stake = /^stake(_test)?1/.test(addressOrStake);
 	const k = await textKey(addressOrStake);
+	const table = stake ? 'stake_utxo' : 'addr_utxo';
 	const [cs, ct] = cursor ? cursor.split(':') : [null, null];
 	const where = cursor ? `AND (slot < ? OR (slot = ? AND tx < ?))` : '';
 	const params: Param[] = cursor ? [blob(k), Number(cs), Number(cs), blob(String(ct))] : [blob(k)];
 	const cols = `slot, lower(hex(tx)) AS tx, idx, ${stake ? 'addr, ' : ''}lovelace, assets, datum`;
-	const rows = await runAll(meter, 'utxoset', `SELECT ${cols} FROM ${stake ? 'stake_utxo' : 'addr_utxo'} WHERE k = ? ${where} ORDER BY slot DESC, tx DESC, idx LIMIT ${limit + 64}`, params, k);
-	const list: Utxo[] = rows.map((r) => ({ slot: Number(r.slot), tx: String(r.tx), idx: Number(r.idx), addr: (r.addr as string) ?? undefined, lovelace: Number(r.lovelace), assets: Number(r.assets), datum: Number(r.datum) === 1 }));
+	const f = await snapshotFiles('utxoset', k);
+	// base outputs spent since the base are listed as gone in the recent part
+	const gone = f.recent ? await run(meter, f.recent, `SELECT lower(hex(tx)) AS tx, idx FROM ${table}_gone WHERE k = ?`, [blob(k)], 1).catch(() => [] as Row[]) : [];
+	const goneSet = new Set(gone.map((g) => `${g.tx}#${g.idx}`));
+	const [base, added] = await Promise.all([
+		f.base ? run(meter, f.base, `SELECT ${cols} FROM ${table} WHERE k = ? ${where} ORDER BY slot DESC, tx DESC, idx LIMIT ${limit + 64 + goneSet.size}`, params, 0) : Promise.resolve([] as Row[]),
+		f.recent ? run(meter, f.recent, `SELECT ${cols} FROM ${table} WHERE k = ? ${where} ORDER BY slot DESC, tx DESC, idx LIMIT ${limit + 64}`, params, 2) : Promise.resolve([] as Row[])
+	]);
+	const list: Utxo[] = [...added, ...base.filter((r) => !goneSet.has(`${r.tx}#${r.idx}`))]
+		.map((r) => ({ slot: Number(r.slot), tx: String(r.tx), idx: Number(r.idx), addr: (r.addr as string) ?? undefined, lovelace: Number(r.lovelace), assets: Number(r.assets), datum: Number(r.datum) === 1 }))
+		.sort((a, b) => b.slot - a.slot || (a.tx < b.tx ? 1 : a.tx > b.tx ? -1 : a.idx - b.idx));
 	let end = Math.min(limit, list.length);
 	while (end > 0 && end < list.length && list[end].slot === list[end - 1].slot && list[end].tx === list[end - 1].tx) end++;
 	const page = list.slice(0, end);
@@ -750,7 +811,9 @@ async function delegEvents(table: 'pool_event' | 'drep_event', keyCol: string, k
 	const params: Param[] = cursor ? [blob(key), Number(cs), Number(cs), String(cst)] : [blob(key)];
 	const other = otherHex ? 'lower(hex(other))' : 'other';
 	const rows = await runAll(meter, 'deleg', `SELECT slot, epoch, stake, kind, ${other} AS other FROM ${table} WHERE ${keyCol} = ? ${where} ORDER BY slot DESC, stake DESC LIMIT ${limit + 1}`, params, key);
-	const list: DelegEvent[] = rows.map((r) => ({ slot: Number(r.slot), epoch: r.epoch == null ? null : Number(r.epoch), stake: String(r.stake), kind: r.kind as DelegEvent['kind'], other: (r.other as string) || null }));
+	const list: DelegEvent[] = rows
+		.map((r) => ({ slot: Number(r.slot), epoch: r.epoch == null ? null : Number(r.epoch), stake: String(r.stake), kind: r.kind as DelegEvent['kind'], other: (r.other as string) || null }))
+		.sort((a, b) => b.slot - a.slot || (a.stake < b.stake ? 1 : a.stake > b.stake ? -1 : 0));
 	const page = list.slice(0, limit);
 	const last = page[page.length - 1];
 	return meter.done({ rows: page, cursor: list.length > limit && last ? `${last.slot}|${last.stake}` : null });
