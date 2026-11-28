@@ -174,8 +174,6 @@
 		{/if}
 	{/await}
 
-	{#await data.drep then d}{#if indexed && d?.drep_id}<PoolDelegators drep={d.drep_id} />{/if}{/await}
-
 	<Panel title="Profile" sub="Self-declared by the DRep (CIP-119), fetched and hash-checked by the publish job" class="mb-6">
 		{#if !m}
 			<p class="text-sm text-muted">No metadata anchor registered.</p>
@@ -209,3 +207,6 @@
 		</Panel>
 	{/if}
 {/await}
+
+<!-- an ever-growing list: last on the page -->
+{#await data.drep then d}{#if indexed && d?.drep_id}<div class="mt-6"><PoolDelegators drep={d.drep_id} /></div>{/if}{/await}
