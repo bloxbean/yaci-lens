@@ -349,10 +349,22 @@ export async function findSpendingTransaction(outputRef: string): Promise<Measur
 	const m = /^([0-9a-f]{64})[#:](\d+)$/i.exec(outputRef.trim());
 	if (!m) throw new Error('expected <tx hash>#<output index>');
 	const meter = new Meter();
-	const links = (await txLinks(m[1], meter)).data;
+	const h = m[1].toLowerCase();
 	const idx = Number(m[2]);
-	const edge = links.children.find((c) => c.outIdx === idx) ?? null;
-	return meter.done({ spent: !!edge, edge, known: !!links.tx && (links.tx.outs == null || idx < links.tx.outs) });
+	const p = h.slice(0, 16);
+	// the output's spend row (both parts, in parallel) and the transaction itself (is the output real?)
+	const [rows, txs] = await Promise.all([
+		runAll(meter, 'utxo', `SELECT lower(hex(by_tx)) AS by8, slot, lovelace, flags FROM spend WHERE out_tx = ? AND out_idx = ?`, [blob(p), idx], p),
+		txByHash([h], meter)
+	]);
+	const tx = txs.data.get(h) ?? null;
+	const known = !!tx && (tx.outs == null || idx < tx.outs);
+	const r = rows.find((x) => !tx || Number(x.slot) >= tx.slot);
+	if (!r) return meter.done({ spent: false, edge: null, known });
+	const full = await txByPrefix([String(r.by8)], meter, new Map([[String(r.by8), Number(r.slot)]]));
+	const by = (full.get(String(r.by8)) ?? []).find((t) => t.slot === Number(r.slot)) ?? (full.get(String(r.by8)) ?? [])[0];
+	const edge: Edge = { outTx: h, outIdx: idx, byTx: by?.hash ?? String(r.by8), slot: Number(r.slot), lovelace: r.lovelace == null ? null : Number(r.lovelace), collateral: (Number(r.flags) & 1) === 1 };
+	return meter.done({ spent: true, edge, known });
 }
 
 // ---- address and stake activity -----------------------------------------------------------------------------------
