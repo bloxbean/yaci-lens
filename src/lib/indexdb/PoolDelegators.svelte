@@ -4,6 +4,7 @@
 	import Hash from '$lib/ui/Hash.svelte';
 	import Badge from '$lib/ui/Badge.svelte';
 	import Skeleton from '$lib/ui/Skeleton.svelte';
+	import PrevNext from '$lib/ui/PrevNext.svelte';
 	import PoolName from '$lib/names/PoolName.svelte';
 	import Cost from './Cost.svelte';
 	import type { Cost as CostT, DelegEvent } from './service';
@@ -14,24 +15,29 @@
 	 */
 	let { pool = undefined, drep = undefined }: { pool?: string; drep?: string } = $props();
 
+	const PAGE = 25;
 	let rows = $state<DelegEvent[]>([]);
-	let cursor = $state<string | null>(null);
-	let done = $state(false);
+	/** starts[i] = the cursor of page i (null: the newest page); next = the cursor after the shown page. */
+	let starts = $state<(string | null)[]>([null]);
+	let page = $state(0);
+	let next = $state<string | null>(null);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let cost = $state<CostT | null>(null);
 	let svc: typeof import('./service') | null = null;
 
-	async function more(first = false) {
+	async function show(i: number) {
 		if (busy) return;
 		busy = true;
 		error = null;
 		try {
 			svc ??= await import('./service');
-			const r = pool ? await svc.getPoolEvents(pool, first ? null : cursor) : await svc.getDrepEvents(drep!, first ? null : cursor);
-			rows = first ? r.data.rows : [...rows, ...r.data.rows];
-			cursor = r.data.cursor;
-			done = !r.data.cursor;
+			const c = starts[i] ?? null;
+			const r = pool ? await svc.getPoolEvents(pool, c, PAGE) : await svc.getDrepEvents(drep!, c, PAGE);
+			rows = r.data.rows;
+			next = r.data.cursor;
+			if (next && starts.length === i + 1) starts = [...starts, next];
+			page = i;
 			cost = r.cost;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -41,7 +47,10 @@
 	}
 	$effect(() => {
 		void (pool ?? drep);
-		untrack(() => more(true));
+		untrack(() => {
+			starts = [null];
+			show(0);
+		});
 	});
 	const time = (slot: number) => (svc ? svc.slotTime(slot).toISOString().slice(0, 10) : '');
 </script>
@@ -65,6 +74,6 @@
 				</li>
 			{/each}
 		</ol>
-		<div class="flex justify-end border-t border-line px-4 py-3">{#if !done}<button class="y-btn h-8 text-xs" onclick={() => more()} disabled={busy}>{busy ? 'Loading…' : 'Older'}</button>{/if}</div>
+		<PrevNext {page} size={PAGE} shown={rows.length} hasNext={!!next} {busy} onprev={() => show(page - 1)} onnext={() => show(page + 1)} />
 	{/if}
 </Panel>
