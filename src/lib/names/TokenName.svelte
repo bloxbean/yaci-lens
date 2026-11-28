@@ -14,4 +14,4 @@
 	});
 </script>
 
-<span title="{meta?.name ? `${meta.name} · ` : ''}{unit}">{#if amount != null}{amount} {/if}{label}</span>
+<span title="{meta?.name ? `${meta.name} · ` : ''}{unit}">{amount != null ? `${amount} ${label}` : label}</span>

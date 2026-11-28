@@ -13,6 +13,7 @@
 	import SeriesChart from '$lib/charts/SeriesChart.svelte';
 	import PoolName from '$lib/names/PoolName.svelte';
 	import TokenName from '$lib/names/TokenName.svelte';
+	import TokenIcon from '$lib/assets/TokenIcon.svelte';
 	import Cost from '$lib/indexdb/Cost.svelte';
 	import PrevNext from '$lib/ui/PrevNext.svelte';
 	import { keysetPages } from '$lib/ui/keyset.svelte';
@@ -188,7 +189,7 @@
 						<ul class="divide-y divide-line text-sm" data-testid="tokens">
 							{#each t.data.slice(tokenPage * SMALL_PAGE, (tokenPage + 1) * SMALL_PAGE) as h (h.unit)}
 								<li class="flex items-center justify-between gap-3 px-4 py-2">
-									<a class="min-w-0 truncate" href="#/assets/unit/{h.unit}"><TokenName unit={h.unit} quantity={h.qty} /></a>
+									<a class="flex min-w-0 items-center gap-3 hover:text-brand" href="#/assets/unit/{h.unit}"><TokenIcon unit={h.unit} /><span class="min-w-0 truncate"><TokenName unit={h.unit} quantity={h.qty} /></span></a>
 									<span class="flex items-center gap-3 whitespace-nowrap text-xs text-faint">{h.utxos} UTxO{h.utxos === 1 ? '' : 's'} <a class="hover:text-brand" href="#/x/holders/{h.unit}">holders</a></span>
 								</li>
 							{/each}
