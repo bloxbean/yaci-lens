@@ -5,6 +5,7 @@
 	import Panel from '$lib/ui/Panel.svelte';
 	import { lake } from '$lib/lake/lake.svelte';
 	import { network } from '$lib/lake/config';
+	import { dataset } from '$lib/lake/dataset.svelte';
 	import { duckdbWasmVersion } from '$lib/lake/db';
 	import { int, isoDay, utc } from '$lib/cardano';
 
@@ -83,6 +84,48 @@
 			</dl>
 		</Panel>
 
+		<Panel title="Licenses" sub="The software and the data are licensed separately">
+			<dl class="flex flex-col gap-4 text-sm leading-relaxed">
+				<div>
+					<dt class="font-medium">Software</dt>
+					<dd class="text-muted">
+						Yaci Lens, <a class="y-link" href="https://github.com/bloxbean/yaci-store" target="_blank" rel="noopener noreferrer">Yaci Store</a> and
+						<a class="y-link" href="https://github.com/bloxbean/yaci-lens-publisher" target="_blank" rel="noopener noreferrer">Yaci Lens Publisher</a> are open source under the
+						<a class="y-link" href="https://github.com/bloxbean/yaci-lens/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT license</a>. The data license below does not
+						apply to the software, or to databases others generate with it.
+					</dd>
+				</div>
+				<div>
+					<dt class="font-medium">Data{dataset.info?.name ? `: ${dataset.info.name}` : ''}</dt>
+					<dd class="text-muted">
+						{#if dataset.status === 'idle' || dataset.status === 'loading'}
+							Reading the data source's description…
+						{:else if dataset.info?.license}
+							{@const d = dataset.info}
+							Published{d.publisher ? ` by ${d.publisher}` : ''}{#if d.source}&nbsp;at <a class="y-link" href={d.source} target="_blank" rel="noopener noreferrer">{d.source}</a>{/if}
+							under the {#if d.licenseUrl}<a class="y-link" href={d.licenseUrl} target="_blank" rel="noopener noreferrer license">{d.licenseName}</a>{:else}{d.licenseName}{/if}, as the
+							data source declares{#if d.noticeUrl}&nbsp;in its <a class="y-link" href={d.noticeUrl} target="_blank" rel="noopener noreferrer">notice</a>{/if}.
+							{#if d.licenseFileUrl}The <a class="y-link" href={d.licenseFileUrl} target="_blank" rel="noopener noreferrer">full license text</a> governs; this summary does not change it.{/if}
+							{#if d.attributionText}
+								<span class="mt-2 block">Suggested credit when you use the data:</span>
+								<span class="mt-1 block rounded-lg border border-line bg-surface-2 px-3 py-2 text-ink">{d.attributionText}</span>
+							{/if}
+							<span class="mt-2 block">
+								The license covers the databases, not the public blockchain facts in them. Third-party content (dApp labels, pool, DRep and proposal documents) keeps its own rights and
+								licenses: see Data sources and credits, and the notice.
+							</span>
+						{:else}
+							{#if dataset.info?.noticeUrl}
+								This data source does not declare a data license (<a class="y-link" href={dataset.info.noticeUrl} target="_blank" rel="noopener noreferrer">notice</a>).
+							{:else}
+								This data source (<code>{dataset.host}</code>) does not publish a description of its license.
+							{/if}
+						{/if}
+					</dd>
+				</div>
+			</dl>
+		</Panel>
+
 		<Panel title="Use the data elsewhere">
 			<p class="mb-3 text-sm text-muted">The same data works from any DuckDB 1.5+, with no key:</p>
 			<pre class="overflow-x-auto rounded-xl border border-line bg-surface-2 p-4 font-mono text-xs leading-relaxed">INSTALL ducklake;
@@ -117,14 +160,15 @@ SELECT count(*) FROM cardano.block;</pre>
 		</Panel>
 		<Panel title="Make your own, or contribute">
 			<p class="mb-3 text-sm text-muted">
-				Yaci Lens is open source (MIT). <a class="y-link" href="https://github.com/bloxbean/yaci-lens" target="_blank" rel="noopener noreferrer">Fork it on GitHub</a>, add the pages
+				Yaci Lens is open source software (MIT). <a class="y-link" href="https://github.com/bloxbean/yaci-lens" target="_blank" rel="noopener noreferrer">Fork it on GitHub</a>, add the pages
 				and dashboards your community needs, change the look, and host your own version on GitHub Pages: no servers, no API keys. Or
 				<a class="y-link" href="https://github.com/bloxbean/yaci-lens" target="_blank" rel="noopener noreferrer">contribute to Yaci Lens</a>: ideas, bug reports and pull requests
 				are welcome.
 			</p>
 			<p class="text-sm text-muted">
 				Publish your own Yaci Store export with <a class="y-link" href="https://github.com/bloxbean/yaci-lens-publisher" target="_blank" rel="noopener noreferrer">Yaci Lens Publisher</a> to any S3-compatible bucket with public reads and CORS, then build Yaci Lens with
-				<code>VITE_LENS_CATALOG_URL</code> and <code>VITE_LENS_SUMMARY_URL</code> pointing at it.
+				<code>VITE_LENS_CATALOG_URL</code> and <code>VITE_LENS_SUMMARY_URL</code> pointing at it. The data you publish is yours to license: the publisher's
+				<code>DATASET_*</code> settings write it into <code>metadata.json</code>, and Yaci Lens shows it here and in the footer.
 			</p>
 		</Panel>
 	</div>

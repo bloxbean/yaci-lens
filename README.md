@@ -18,7 +18,7 @@ DuckDB-WASM, and hosted on GitHub Pages.
 - Static website deployment.
 - Self-hostable using compatible object storage.
 
-**Open source (MIT): fork it and make your own Yaci Lens, or contribute to Yaci Lens.** Add the pages and
+**Open-source software (MIT): fork it and make your own Yaci Lens, or contribute to Yaci Lens.** Add the pages and
 dashboards your community needs, change the look, point it at your own data and host it on your own GitHub Pages,
 or send your improvements back so everyone gets them. See
 [Make your own Yaci Lens, or contribute](#make-your-own-yaci-lens-or-contribute).
@@ -120,10 +120,11 @@ on any static host without rewrite rules.
 |---|---|
 | `VITE_LENS_CATALOG_URL` | `https://data.bloxbean.org/mainnet/v1/catalog.ducklake` |
 | `VITE_LENS_SUMMARY_URL` | `https://data.bloxbean.org/mainnet/v1/summary/` |
+| `VITE_LENS_DATA_METADATA_URL` | `metadata.json` next to the catalog: the data source's name, publisher and data license, shown in the footer and on the About page |
 
 ## Make your own Yaci Lens, or contribute
 
-Yaci Lens is open source under the MIT license, and everything it needs is static, so your own version is a fork away:
+Yaci Lens is open-source software under the MIT license, and everything it needs is static, so your own version is a fork away:
 
 1. **Fork** this repository on GitHub.
 2. **Change what you like**: add pages under `src/routes/`, charts with the kit in `src/lib/charts/`, starter
@@ -150,7 +151,8 @@ The page needs CORS on the data bucket (`GET`/`HEAD`, any origin, exposing `Cont
 
 Publish your own Yaci Store analytics export (DuckLake with a DuckDB catalog) with
 [Yaci Lens Publisher](https://github.com/bloxbean/yaci-lens-publisher) to any S3-compatible bucket with public reads and CORS, then build Yaci Lens with the
-two variables above pointing at it.
+two variables above pointing at it. The data you publish is yours to license: set the publisher's `DATASET_*`
+settings, and Yaci Lens shows what your `metadata.json` declares.
 
 ## Project layout
 
@@ -200,4 +202,22 @@ Thank you to all of these projects. The About page in the app lists the same.
 
 ## License
 
-MIT
+| Component | License |
+|---|---|
+| Yaci Lens (this repository) | [MIT](LICENSE) |
+| [Yaci Lens Publisher](https://github.com/bloxbean/yaci-lens-publisher), [Yaci Store](https://github.com/bloxbean/yaci-store) | MIT |
+| BloxBean Open Data, the databases at https://data.bloxbean.org | [Open Database License (ODbL) v1.0](https://opendatacommons.org/licenses/odbl/1-0/), see [DATA-LICENSE.md](DATA-LICENSE.md) |
+| Databases you generate with Yaci Store and Yaci Lens Publisher | Your choice, subject to applicable rights |
+
+The MIT license covers the software only. It does not apply to the BloxBean hosted databases, and the ODbL does not
+apply to the software or to databases generated independently with it. Databases derived from the BloxBean hosted
+databases remain subject to the ODbL's obligations.
+
+Suggested attribution when you use BloxBean Open Data:
+
+> Contains data from BloxBean Open Data, powered by Yaci Store and made available under the Open Database License
+> (ODbL) v1.0. Data source: https://data.bloxbean.org
+
+Third-party content (see [Data sources and credits](#data-sources-and-credits)) keeps its own rights and licenses;
+the data source's `NOTICE.md` lists it. Yaci Lens reads the data source's `metadata.json` and shows the license it
+declares in the footer and on the About page; a data source that declares none is shown without a license.
