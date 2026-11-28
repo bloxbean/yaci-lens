@@ -162,6 +162,14 @@
 <Gate>
 	<div class="mb-5"><Tabs {tabs} bind:active={tab} param="tab" /></div>
 
+	{#await S().then((s) => s.coverage(isStake ? 'stake' : 'address')) then c}
+		{#if !c.full}
+			<div class="mb-5 rounded-xl border border-amber/30 bg-amber/10 px-4 py-3 text-sm" data-testid="coverage">
+				The {isStake ? 'stake' : 'address'} index currently covers only activity since {c.from}: balances and totals below are for that period, not the full history.
+			</div>
+		{/if}
+	{/await}
+
 	{#if tab === 'overview'}
 		{#await summary}
 			<div class="y-panel"><Skeleton rows={6} /></div>

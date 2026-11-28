@@ -57,7 +57,7 @@
 <section class="y-panel flex min-w-0 flex-col overflow-hidden {span}">
 	<header class="flex items-center gap-2 border-b border-line/70 px-4 py-3">
 		<h3 class="min-w-0 flex-1 truncate font-display text-[15px] font-semibold" title={widget.title}>{widget.title}</h3>
-		{#await result then r}<span class="text-[11px] tabular-nums text-faint" title="{r.rows.length} rows{r.truncated ? ' (truncated)' : ''}">{r.ms < 1000 ? `${Math.round(r.ms)} ms` : `${(r.ms / 1000).toFixed(1)} s`}</span>{/await}
+		{#await result then r}<span class="text-[11px] tabular-nums text-faint" title="{r.rows.length} rows{r.truncated ? ' (truncated)' : ''}">{r.ms < 1000 ? `${Math.round(r.ms)} ms` : `${(r.ms / 1000).toFixed(1)} s`}</span>{:catch}{/await}
 		{#if editing}
 			<button class="y-icon-btn h-7 w-7" title="Move up" aria-label="Move up" onclick={() => onmove?.(-1)}><ArrowUp class="h-3.5 w-3.5" /></button>
 			<button class="y-icon-btn h-7 w-7" title="Move down" aria-label="Move down" onclick={() => onmove?.(1)}><ArrowDown class="h-3.5 w-3.5" /></button>

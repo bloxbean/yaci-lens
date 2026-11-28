@@ -790,6 +790,14 @@ export async function getScriptDays(scriptHash: string): Promise<Measured<Script
 	return meter.done([...by.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v));
 }
 
+/** What a db covers: from the chain's start when it has a history part, else only from its recent part's first day. */
+export async function coverage(db: DbName): Promise<{ full: boolean; from: string | null }> {
+	const m = await manifest();
+	const fs = m.dbs[db]?.files ?? [];
+	if (fs.some((f) => f.part === 'history' || f.part === 'current')) return { full: true, from: null };
+	return { full: false, from: fs.find((f) => f.part === 'recent')?.from_date ?? null };
+}
+
 // ---- generic --------------------------------------------------------------------------------------------------------
 
 /** Run any read-only SQL on one part of a db, in the shard of `keyHex` (for the status page and benchmarks). */
