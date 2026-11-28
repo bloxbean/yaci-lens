@@ -2,7 +2,7 @@
 // Each scenario runs in a fresh browser context (cold HTTP cache); "warm" repeats with other keys in the same session.
 // Requests/bytes are counted on the network (Playwright), so both engines are measured the same way.
 //   BROWSER=chromium|webkit BASE=http://localhost:5175/ CHUNKS=16384 node bench.mjs > out.json
-import { chromium, webkit } from 'playwright';
+import { chromium, webkit, firefox } from 'playwright';
 import fs from 'node:fs';
 
 const BASE = process.env.BASE ?? 'http://localhost:5175/';
@@ -11,7 +11,7 @@ const CHUNKS = (process.env.CHUNKS ?? '16384').split(',').map(Number);
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const F = JSON.parse(fs.readFileSync(new URL('./fixtures.json', import.meta.url)));
 
-const launcher = BROWSER === 'webkit' ? webkit : chromium;
+const launcher = { webkit, firefox, chromium }[BROWSER];
 const browser = await launcher.launch();
 
 async function session(chunk) {
