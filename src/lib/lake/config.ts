@@ -10,6 +10,8 @@ export interface Network {
 	catalogUrl: string;
 	/** Folder holding the summary pack (epochs.parquet, daily.parquet, ...), with a trailing slash. */
 	summaryUrl: string;
+	/** The data source's own description (publisher, data license): metadata.json next to the catalog. */
+	metadataUrl: string;
 }
 
 const env = import.meta.env;
@@ -19,7 +21,8 @@ export const NETWORKS: Network[] = [
 		id: 'mainnet',
 		label: 'Mainnet',
 		catalogUrl: env.VITE_LENS_CATALOG_URL ?? 'https://data.bloxbean.org/mainnet/v1/catalog.ducklake',
-		summaryUrl: env.VITE_LENS_SUMMARY_URL ?? 'https://data.bloxbean.org/mainnet/v1/summary/'
+		summaryUrl: env.VITE_LENS_SUMMARY_URL ?? 'https://data.bloxbean.org/mainnet/v1/summary/',
+		metadataUrl: env.VITE_LENS_DATA_METADATA_URL ?? new URL('metadata.json', env.VITE_LENS_CATALOG_URL ?? 'https://data.bloxbean.org/mainnet/v1/catalog.ducklake').href
 	}
 ];
 

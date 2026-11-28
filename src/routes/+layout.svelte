@@ -6,6 +6,7 @@
 	import { onMount, type Snippet } from 'svelte';
 	import { shell } from '$lib/shell/ui.svelte';
 	import { lake } from '$lib/lake/lake.svelte';
+	import { dataset, shortLicense } from '$lib/lake/dataset.svelte';
 	import Sidebar from '$lib/shell/Sidebar.svelte';
 	import Topbar from '$lib/shell/Topbar.svelte';
 	import NavProgress from '$lib/shell/NavProgress.svelte';
@@ -17,6 +18,7 @@
 		shell.restore();
 		// Start DuckDB-WASM right away: every page needs it, and the first start takes a few seconds.
 		lake.ready().catch(() => {});
+		dataset.load();
 		document.documentElement.dataset.ready = '';
 	});
 </script>
@@ -43,12 +45,22 @@
 	</main>
 
 	<footer class="border-t border-line/70">
-		<div class="mx-auto flex max-w-[1480px] flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-faint sm:flex-row sm:px-6 lg:px-8">
+		<div class="mx-auto flex max-w-[1480px] flex-col items-center justify-between gap-2 px-4 py-5 text-center text-xs text-faint sm:flex-row sm:text-left sm:px-6 lg:px-8">
 			<span
-				>Yaci Lens · data from <a class="y-link" href="https://github.com/bloxbean/yaci-store" target="_blank" rel="noopener noreferrer">Yaci Store</a>, queried in your
-				browser with <a class="y-link" href="https://duckdb.org/docs/api/wasm/overview" target="_blank" rel="noopener noreferrer">DuckDB-WASM</a></span
+				>Yaci Lens v{__LENS_VERSION__} · Powered by <a class="y-link" href="https://github.com/bloxbean/yaci-store" target="_blank" rel="noopener noreferrer">Yaci Store</a>
+				· <a class="y-link" href="https://github.com/bloxbean/yaci-lens" target="_blank" rel="noopener noreferrer">fork it or contribute</a></span
 			>
-			<span>v{__LENS_VERSION__} · Open source by <a class="y-link" href="https://github.com/bloxbean" target="_blank" rel="noopener noreferrer">BloxBean</a> · MIT · <a class="y-link" href="https://github.com/bloxbean/yaci-lens" target="_blank" rel="noopener noreferrer">fork it or contribute</a></span>
+			<span>
+				Software: <a class="y-link" href="https://github.com/bloxbean/yaci-lens/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT</a> ·
+				{#if dataset.info?.license}
+					{@const d = dataset.info}
+					{#if d.source}<a class="y-link" href={d.source} target="_blank" rel="noopener noreferrer">{d.name ?? 'Data'}</a>{:else}{d.name ?? 'Data'}{/if}:
+					{#if d.licenseUrl}<a class="y-link" href={d.licenseUrl} target="_blank" rel="noopener noreferrer license" title={d.licenseName}>{shortLicense(d.license ?? '')}</a
+						>{:else}<span title={d.licenseName}>{shortLicense(d.license ?? '')}</span>{/if}
+				{:else}
+					Data: <a class="y-link" href="#/about">{dataset.info?.name ?? dataset.host}</a>
+				{/if}
+			</span>
 		</div>
 	</footer>
 </div>
