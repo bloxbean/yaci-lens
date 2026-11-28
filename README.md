@@ -130,7 +130,31 @@ on any static host without rewrite rules.
 |---|---|
 | `VITE_LENS_CATALOG_URL` | `https://data.bloxbean.org/mainnet/v1/catalog.ducklake` |
 | `VITE_LENS_SUMMARY_URL` | `https://data.bloxbean.org/mainnet/v1/summary/` |
+| `VITE_LENS_INDEX_URL` | *(empty: off)* — experimental SQLite indexes, see below |
 | `VITE_LENS_DATA_METADATA_URL` | `metadata.json` next to the catalog: the data source's name, publisher and data license, shown in the footer and on the About page |
+
+### Experimental: indexed lookups (SQLite-WASM)
+
+Some questions are lookups rather than analytics: who spent this output, what did this address do, who holds this
+token. The lake answers those only by scanning many partitions, so a build with `VITE_LENS_INDEX_URL` can also read
+small **SQLite index files** published next to the lake (see the publisher's `SQLITE-INDEXES.md`), with
+**SQLite-WASM over HTTP range requests**: a lookup reads a few 16 KB pieces of a remote B-tree, never a whole file.
+DuckDB-WASM stays the analytics engine and still reads the details from the lake.
+
+- Off unless the build sets `VITE_LENS_INDEX_URL` and the viewer turns it on (`#/x`, or `?exp=index` in a URL);
+  nothing of it loads otherwise. The worker (~230 KB) and the SQLite WASM (~860 KB) load on first use.
+- Pages: `#/x` (status, chain-point check, lookup), `#/x/graph/<tx>` (transaction graph), `#/x/address/<addr1…|stake1…>`
+  (activity, a stake credential's addresses and certificates), `#/x/script/<hash>` (executions, state outputs and
+  datums), `#/x/holders/<unit>` (holders at the tip), name search on `#/x`; a spent-by panel on transaction pages.
+- How it reads: `src/lib/indexdb/http-vfs.ts` is a read-only SQLite VFS doing synchronous range requests in a
+  dedicated worker (no SharedArrayBuffer, so no COOP/COEP headers: it works on GitHub Pages); `client.ts` runs four
+  such workers so independent lookups go in parallel; `service.ts` is the lookup API (shards, history + recent parts,
+  keyset pagination, request / byte / time cost of every call).
+- Benchmarks: `bench/` (Playwright) drives `#/x/bench`.
+
+```bash
+VITE_LENS_INDEX_URL=https://data-test.bloxbean.org/mainnet/v1/indexes/ npm run dev   # then open #/x?exp=index
+```
 
 ## Make your own Yaci Lens, or contribute
 
