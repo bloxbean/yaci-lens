@@ -1,0 +1,25 @@
+// Off -> menu shows "(off)" -> Turn on -> on (menu, search routing) -> Turn off -> "(off)" again.
+import { chromium } from 'playwright';
+const BASE = process.env.BASE ?? 'http://localhost:5174/';
+const browser = await chromium.launch();
+const page = await (await browser.newContext()).newPage();
+const errors = [];
+page.on('pageerror', (e) => errors.push(e.message));
+const menu = async () => (await page.$$eval('nav[aria-label=Main] a', (as) => as.map((a) => a.textContent.trim()))).filter((t) => t.startsWith('Indexed'));
+await page.goto(`${BASE}#/`);
+await page.evaluate(() => localStorage.setItem('lens:exp:index', '0'));
+await page.reload();
+await page.waitForTimeout(1500);
+console.log('off: menu', await menu());
+await page.click('nav[aria-label=Main] a:has-text("Indexed lookups")');
+await page.waitForSelector('[data-testid=toggle]');
+console.log('off: hub says', (await page.textContent('[data-testid=off]')).replace(/\s+/g, ' ').trim().slice(-80), '| button:', await page.textContent('[data-testid=toggle]'));
+await Promise.all([page.waitForNavigation().catch(() => {}), page.click('[data-testid=toggle]')]);
+await page.waitForSelector('[data-testid=files] tbody tr', { timeout: 60000 });
+await page.waitForTimeout(1000);
+console.log('on: menu', await menu(), '| button:', await page.textContent('[data-testid=toggle]'));
+await Promise.all([page.waitForNavigation().catch(() => {}), page.click('[data-testid=toggle]')]);
+await page.waitForTimeout(1500);
+console.log('off again: menu', await menu(), '| stored', await page.evaluate(() => localStorage.getItem('lens:exp:index')));
+console.log('errors:', errors.length ? errors.join(' | ') : 'none');
+await browser.close();

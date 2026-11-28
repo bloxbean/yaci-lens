@@ -18,6 +18,12 @@
 	import ShieldAlert from '@lucide/svelte/icons/shield-alert';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import { poolMeta, poolLabel } from '$lib/lake/offchain';
+	import PoolHistory from '$lib/pools/PoolHistory.svelte';
+	import PoolDelegators from '$lib/indexdb/PoolDelegators.svelte';
+	import { indexEnabled } from '$lib/indexdb/config';
+	// delegator flows come from the SQLite indexes, when they are on and published
+	let indexed = $state(false);
+	if (indexEnabled()) import('$lib/indexdb/service').then((s) => s.indexAvailable()).then((ok) => (indexed = ok));
 
 	const id = $derived(page.params.id ?? '');
 	const hash = $derived(poolHash(id));
@@ -109,7 +115,9 @@ GROUP BY 1 ORDER BY 1`;
 		{/if}
 	{/await}
 
-	<section class="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+	<PoolHistory {hash} />
+
+	<section class="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
 		<Panel title="Largest delegators" sub="Live query: stake active in epoch {lake.tip?.epoch ?? '…'}" flush>
 			{#snippet actions()}{#if lake.tip}<SqlButton sql={delegSql(hash, lake.tip.epoch)} />{/if}{/snippet}
 			{#if data.delegators}
@@ -118,7 +126,7 @@ GROUP BY 1 ORDER BY 1`;
 				{:then rows}
 					<DataTable {rows} columns={dcols} key={(d) => d.address} dense emptyTitle="No delegators in this snapshot">
 						{#snippet cell(d, k)}
-							{#if k === 'address'}<span class="font-mono text-xs">{shorten(d.address, 16, 10)}</span>
+							{#if k === 'address'}{#if indexed}<a class="y-link font-mono text-xs" href="#/x/address/{d.address}">{shorten(d.address, 16, 10)}</a>{:else}<span class="font-mono text-xs">{shorten(d.address, 16, 10)}</span>{/if}
 							{:else if k === 'since'}<span class="tabular-nums text-muted">{d.delegation_epoch}</span>
 							{:else if k === 'stake'}<span class="tabular-nums">{adaShort(d.stake_ada)}</span>
 							{/if}
@@ -148,4 +156,5 @@ GROUP BY 1 ORDER BY 1`;
 			{:else}<Skeleton rows={3} />{/if}
 		</Panel>
 	</section>
+	{#if indexed}<PoolDelegators pool={hash} />{/if}
 {/if}

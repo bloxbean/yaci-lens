@@ -15,6 +15,8 @@ import Coins from '@lucide/svelte/icons/coins';
 import FileCode from '@lucide/svelte/icons/file-code';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 import Fish from '@lucide/svelte/icons/fish';
+import Zap from '@lucide/svelte/icons/zap';
+import { INDEX_URL, indexEnabled } from '$lib/indexdb/config';
 
 export interface NavItem {
 	label: string;
@@ -65,7 +67,25 @@ export const NAV: NavGroup[] = [
 	}
 ];
 
-export const ALL_PAGES: NavItem[] = NAV.flatMap((g) => g.items);
+/** EXPERIMENTAL: indexed lookups (SQLite-WASM), listed only when the build has an index URL and the viewer turned them on. */
+const EXPERIMENTAL: NavGroup = {
+	label: 'Experimental',
+	items: [{ label: 'Indexed lookups', href: '/x', icon: Zap, keywords: 'sqlite index graph address stake holders search' }]
+};
+
+/**
+ * The navigation with the experimental group, in builds that have indexes (VITE_LENS_INDEX_URL):
+ *  - turned off by the viewer: shown as "(off)", so the page that turns it back on is always one click away;
+ *  - on: shown when the indexes are published (the manifest loads), else hidden (there is nothing to use).
+ */
+export async function navGroups(): Promise<NavGroup[]> {
+	if (!INDEX_URL) return NAV;
+	if (!indexEnabled()) return [...NAV, { ...EXPERIMENTAL, items: EXPERIMENTAL.items.map((i) => ({ ...i, label: `${i.label} (off)` })) }];
+	const { indexAvailable } = await import('$lib/indexdb/service');
+	return (await indexAvailable()) ? [...NAV, EXPERIMENTAL] : NAV;
+}
+
+export const ALL_PAGES: NavItem[] = [...NAV, ...(INDEX_URL ? [EXPERIMENTAL] : [])].flatMap((g) => g.items);
 
 /** The nav item for a path: the one whose href or match prefix is the longest match. */
 export function activeHref(path: string): string | null {

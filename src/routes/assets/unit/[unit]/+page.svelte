@@ -3,6 +3,11 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import { page } from '$app/state';
 	import PageHeader from '$lib/ui/PageHeader.svelte';
+	import HoldersPanel from '$lib/indexdb/HoldersPanel.svelte';
+	import { indexEnabled } from '$lib/indexdb/config';
+	// holders come from the SQLite indexes, when they are on and published
+	let indexed = $state(false);
+	if (indexEnabled()) import('$lib/indexdb/service').then((s) => s.indexAvailable()).then((ok) => (indexed = ok));
 	import Panel from '$lib/ui/Panel.svelte';
 	import KV from '$lib/ui/KV.svelte';
 	import Hash from '$lib/ui/Hash.svelte';
@@ -170,6 +175,8 @@
 				{/if}
 			</Panel>
 		</section>
+
+		{#if indexed}<HoldersPanel {unit} {decimals} />{/if}
 
 		{#if meta}
 			<Panel title="Mint metadata (CIP-25)" sub="Label 721 of the transaction that first minted it" class="mb-6">

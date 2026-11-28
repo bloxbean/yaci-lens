@@ -1,0 +1,9 @@
+{
+  "name": "yaci-lens-bench",
+  "private": true,
+  "description": "Playwright checks and benchmarks for the experimental indexed lookups (#/x). Not part of the app build.",
+  "type": "module",
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
+}

@@ -70,7 +70,8 @@
 	}
 	const hoverX = $derived(hover == null ? 0 : kind === 'line' || kind === 'area' ? (xs(hover) / W) * 100 : ((hover + 0.5) / n) * 100);
 	const ticks = $derived([0.25, 0.5, 0.75, 1].map((f) => f * max));
-	const xLabels = $derived(n > 2 ? [0, Math.floor((n - 1) / 2), n - 1] : n ? [0, n - 1] : []);
+	// distinct positions (a single point would otherwise repeat index 0, a duplicate key)
+	const xLabels = $derived([...new Set(n > 2 ? [0, Math.floor((n - 1) / 2), n - 1] : n ? [0, n - 1] : [])]);
 </script>
 
 {#if n}

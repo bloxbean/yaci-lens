@@ -13,8 +13,10 @@
 		inputs,
 		outputs,
 		fee,
-		ondatum = undefined
-	}: { inputs: Utxo[]; outputs: Utxo[]; fee: number | string; ondatum?: (u: Utxo) => void } = $props();
+		ondatum = undefined,
+		spent = null,
+		linkAddress = false
+	}: { inputs: Utxo[]; outputs: Utxo[]; fee: number | string; ondatum?: (u: Utxo) => void; spent?: Map<number, string | null> | null; linkAddress?: boolean } = $props();
 
 	const inAddrs = $derived(new Set(inputs.map((i) => i.address)));
 	const inTotal = $derived(sumLovelace(inputs));
@@ -30,7 +32,7 @@
 		</div>
 		<ul class="flex flex-col gap-2.5">
 			{#each inputs as u (u.tx_hash + u.output_index)}
-				<li class="flow-in relative"><UtxoCard utxo={u} side="in" {ondatum} /></li>
+				<li class="flow-in relative"><UtxoCard utxo={u} side="in" {ondatum} {linkAddress} /></li>
 			{/each}
 		</ul>
 	</div>
@@ -57,7 +59,7 @@
 		</div>
 		<ul class="flex flex-col gap-2.5">
 			{#each outputs as u (u.output_index)}
-				<li class="flow-out relative"><UtxoCard utxo={u} side="out" tag={inAddrs.has(u.address) ? 'change' : undefined} {ondatum} /></li>
+				<li class="flow-out relative"><UtxoCard utxo={u} side="out" tag={inAddrs.has(u.address) ? 'change' : undefined} {ondatum} {linkAddress} spentBy={spent ? spent.get(u.output_index) : undefined} /></li>
 			{/each}
 		</ul>
 	</div>

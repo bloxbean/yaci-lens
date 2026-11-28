@@ -1,4 +1,7 @@
 <script lang="ts">
+	import PrevNext from '$lib/ui/PrevNext.svelte';
+	import PoolDelegators from '$lib/indexdb/PoolDelegators.svelte';
+	import { indexEnabled } from '$lib/indexdb/config';
 	import Users from '@lucide/svelte/icons/users';
 	import ShieldCheck from '@lucide/svelte/icons/shield-check';
 	import ShieldAlert from '@lucide/svelte/icons/shield-alert';
@@ -29,6 +32,17 @@
 	 * how it voted, and how often it agreed with the outcome and with the SPOs' and the committee's majority.
 	 */
 	const id = $derived((page.params.id ?? '').toLowerCase());
+	// votes: fixed-size pages
+	const VOTES_PAGE = 25;
+	let votePage = $state(0);
+	$effect(() => {
+		void id;
+		votePage = 0;
+	});
+
+	// delegators joining / leaving (SQLite deleg index), when the indexes are on and published
+	let indexed = $state(false);
+	if (indexEnabled()) import('$lib/indexdb/service').then((s) => s.indexAvailable()).then((ok) => (indexed = ok));
 
 	const data = $derived.by(() => {
 		const key = id;
@@ -150,10 +164,10 @@
 		</section>
 
 		{#if rec.mine.length}
-			<Panel title="Votes" sub="Latest vote on each action, newest first" class="mb-6" flush>
+			<Panel title="Votes" sub="Latest vote on each action, newest first · {rec.mine.length} votes" class="mb-6" flush>
 				{#snippet actions()}<SqlButton sql={`SELECT * FROM '${summaryUrl('votes')}' WHERE voter_hash = '${rec.hash}' ORDER BY slot DESC`} />{/snippet}
 				<ul class="divide-y divide-line/70">
-					{#each rec.mine as v (v.tx_hash + voteKey(v))}
+					{#each rec.mine.slice(votePage * VOTES_PAGE, (votePage + 1) * VOTES_PAGE) as v (v.tx_hash + voteKey(v))}
 						{@const p = rec.byAction.get(voteKey(v))}
 						<li class="flex flex-wrap items-center gap-3 px-5 py-2.5 text-sm">
 							<Badge tone={voteTone(v.vote)}>{v.vote}</Badge>
@@ -165,6 +179,9 @@
 						</li>
 					{/each}
 				</ul>
+				{#if rec.mine.length > VOTES_PAGE}
+					<PrevNext page={votePage} size={VOTES_PAGE} shown={rec.mine.slice(votePage * VOTES_PAGE, (votePage + 1) * VOTES_PAGE).length} total={rec.mine.length} hasNext={(votePage + 1) * VOTES_PAGE < rec.mine.length} onprev={() => votePage--} onnext={() => votePage++} />
+				{/if}
 			</Panel>
 		{/if}
 	{/await}
@@ -202,3 +219,6 @@
 		</Panel>
 	{/if}
 {/await}
+
+<!-- an ever-growing list: last on the page -->
+{#await data.drep then d}{#if indexed && d?.drep_id}<div class="mt-6"><PoolDelegators drep={d.drep_id} /></div>{/if}{/await}

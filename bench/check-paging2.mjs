@@ -1,0 +1,30 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+const F = JSON.parse(fs.readFileSync(new URL('./fixtures.json', import.meta.url)));
+const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
+const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+const B = 'http://localhost:5174/#';
+async function roundTrip(label, url, scope, rowSel) {
+	await p.goto(B + url);
+	await p.waitForSelector(`${scope} ${rowSel}`, { timeout: 90000 });
+	const first = async () => (await p.locator(`${scope} ${rowSel}`).first().innerText()).replace(/\s+/g, ' ').slice(0, 50);
+	const foot = async () => (await p.locator(`${scope} [data-testid=prevnext] span`).first().innerText()).replace(/\s+/g, ' ');
+	const n = async () => p.locator(`${scope} ${rowSel}`).count();
+	const a = await first(); const f1 = await foot(); const n1 = await n();
+	await p.click(`${scope} [data-testid=older]`); await p.waitForFunction((s) => !document.querySelector(`${s} [data-testid=older]`)?.hasAttribute('disabled') || true, scope); await p.waitForTimeout(2500);
+	const b2 = await first(); const f2 = await foot(); const n2 = await n();
+	await p.click(`${scope} [data-testid=newer]`); await p.waitForTimeout(2500);
+	const c = await first();
+	console.log(`${label}: p1 ${n1} rows (${f1}) → p2 ${n2} rows (${f2}), different ${a !== b2}, back to same first row ${a === c}`);
+}
+await roundTrip('stake transactions', `/x/address/${F.stakeBusy}?tab=txs`, 'section:has([data-testid=activity])', 'tbody tr');
+await roundTrip('stake UTxOs', `/x/address/${F.stakeBusy}?tab=utxos`, 'section:has([data-testid=utxos])', 'tbody tr');
+await p.goto(`${B}/x/address/${F.stakeBusy}?tab=tokens`); await p.waitForSelector('[data-testid=tokens] li', { timeout: 60000 });
+const tf = await p.locator('section:has([data-testid=tokens]) [data-testid=prevnext] span').first().innerText().catch(() => '(one page)');
+console.log(`tokens held: ${await p.locator('[data-testid=tokens] li').count()} rows on page 1 (${tf.replace(/\s+/g, ' ')})`);
+await roundTrip('script executions', `/x/script/${F.scriptTop}`, 'section:has([data-testid=runs])', 'tbody tr');
+await roundTrip('script state', `/x/script/${F.scriptTop}`, 'section:has([data-testid=state])', 'tbody tr');
+await p.waitForTimeout(4000);
+console.log('script state spent column filled on page 1:', await p.locator('section:has([data-testid=state]) tbody tr td:last-child').filter({ hasNotText: '…' }).count(), 'of', await p.locator('section:has([data-testid=state]) tbody tr').count());
+console.log('errors:', errs.length ? errs.join(' | ') : 'none');
+await b.close();

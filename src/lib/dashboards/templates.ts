@@ -1,7 +1,16 @@
 /* Starter dashboards: copies the user can change. They read the summary pack, so they load in a second or two. */
-import type { Widget } from './store.svelte';
+import type { Param, Widget } from './store.svelte';
 
-type Template = { id: string; name: string; description: string; widgets: Omit<Widget, 'id'>[] };
+type Template = {
+	id: string;
+	name: string;
+	description: string;
+	widgets: Omit<Widget, 'id'>[];
+	/** Inputs of the dashboard ({$name} in SQL, and lookups). */
+	params?: Param[];
+	/** Uses indexed lookups: offered only when they are on. */
+	indexed?: boolean;
+};
 
 export const TEMPLATES: Template[] = [
 	{
@@ -136,6 +145,55 @@ export const TEMPLATES: Template[] = [
 				viz: { type: 'barlist' },
 				sql: `SELECT coalesce(p.ticker, left(b.slot_leader, 12)) AS pool, count(*) AS blocks\nFROM block b LEFT JOIN {pool_meta} p ON p.pool_hash = b.slot_leader\nWHERE b.date = {tip_date}\nGROUP BY 1 ORDER BY 2 DESC LIMIT 20`
 			}
+		]
+	},
+	{
+		id: 'wallet',
+		name: 'My wallet',
+		description: 'Balance, balance over time, rewards, flows, tokens, delegation and latest transactions of a stake address (indexed lookups).',
+		indexed: true,
+		params: [{ name: 'stake', kind: 'stake', value: '' }],
+		widgets: [
+			{ title: 'Balance', width: 1, viz: { type: 'stat', format: 'ada' }, sql: '', lookup: { kind: 'wallet-balance', param: 'stake' }, note: 'ADA in its addresses at the published tip; rewards not included.' },
+			{ title: 'Balance over time', width: 2, viz: { type: 'area', format: 'ada' }, sql: '', lookup: { kind: 'wallet-history', param: 'stake' } },
+			{ title: 'Rewards per epoch', width: 2, viz: { type: 'stacked', format: 'ada' }, sql: '', lookup: { kind: 'rewards', param: 'stake' } },
+			{ title: 'Received and sent per month', width: 1, viz: { type: 'bar', format: 'ada' }, sql: '', lookup: { kind: 'wallet-flows', param: 'stake' } },
+			{ title: 'Tokens held', width: 1, viz: { type: 'table' }, sql: '', lookup: { kind: 'tokens-held', param: 'stake' } },
+			{ title: 'Delegation history', width: 1, viz: { type: 'table' }, sql: '', lookup: { kind: 'delegation', param: 'stake' } },
+			{ title: 'Unspent outputs', width: 1, viz: { type: 'table' }, sql: '', lookup: { kind: 'utxos', param: 'stake' } },
+			{ title: 'Latest transactions', width: 3, viz: { type: 'table' }, sql: '', lookup: { kind: 'wallet-activity', param: 'stake' } }
+		]
+	},
+	{
+		id: 'pool',
+		name: 'Pool operator',
+		description: "A stake pool over time: stake, delegators, blocks vs expected, members' return, joins and leaves, parameter changes.",
+		params: [{ name: 'pool', kind: 'pool', value: '' }],
+		widgets: [
+			{ title: 'Lifetime', width: 1, viz: { type: 'stat' }, sql: `SELECT count(*) AS epochs, sum(blocks) AS blocks, round(sum(member_rewards_ada)) AS member_rewards_ada\nFROM {pool_epochs}\nWHERE pool_hash = {$pool} AND epoch <= {tip_epoch}` },
+			{ title: 'Active stake', width: 2, viz: { type: 'area', format: 'ada' }, sql: `SELECT epoch, stake_ada\nFROM {pool_epochs}\nWHERE pool_hash = {$pool} AND epoch <= {tip_epoch}\nORDER BY epoch` },
+			{ title: 'Blocks made vs expected, last 50 epochs', width: 2, viz: { type: 'bar' }, sql: `SELECT epoch, blocks, round(expected_blocks, 1) AS expected\nFROM {pool_epochs}\nWHERE pool_hash = {$pool} AND epoch <= {tip_epoch}\nORDER BY epoch DESC LIMIT 50` },
+			{ title: "Members' return (annualised)", width: 1, viz: { type: 'line', format: 'percent' }, sql: `SELECT epoch, member_roa\nFROM {pool_epochs}\nWHERE pool_hash = {$pool} AND member_roa IS NOT NULL\nORDER BY epoch` },
+			{ title: 'Delegators', width: 1, viz: { type: 'line' }, sql: `SELECT epoch, delegators\nFROM {pool_epochs}\nWHERE pool_hash = {$pool} AND epoch <= {tip_epoch}\nORDER BY epoch` },
+			{ title: 'Stake keys joining and leaving', width: 2, viz: { type: 'bar' }, sql: `SELECT epoch, joins, leaves\nFROM {pool_epochs}\nWHERE pool_hash = {$pool} AND epoch <= {tip_epoch}\nORDER BY epoch DESC LIMIT 60` },
+			{ title: 'Parameter changes', width: 3, viz: { type: 'table' }, sql: `SELECT block_time, kind, pledge_ada, margin, cost_ada, retiring_epoch\nFROM {pool_updates}\nWHERE pool_hash = {$pool}\nORDER BY slot DESC` },
+			{ title: 'Latest delegators joining and leaving', width: 3, viz: { type: 'table' }, sql: '', lookup: { kind: 'pool-events', param: 'pool' }, note: 'Indexed lookup.' }
+		]
+	},
+	{
+		id: 'dapp',
+		name: 'dApp and token',
+		description: 'A smart contract (value locked, transactions, fees) and a token (largest holders), with indexed lookups.',
+		indexed: true,
+		params: [
+			{ name: 'script', kind: 'script', value: 'a65ca58a4e9c755fa830173d2a5caed458ac0c73f97db7faae2e7e3b' },
+			{ name: 'token', kind: 'unit', value: 'a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235484f534b59' }
+		],
+		widgets: [
+			{ title: 'Value locked at the script', width: 2, viz: { type: 'area', format: 'ada' }, sql: '', lookup: { kind: 'script-tvl', param: 'script' } },
+			{ title: 'Largest token holders', width: 1, viz: { type: 'barlist', format: 'percent' }, sql: '', lookup: { kind: 'holders', param: 'token' } },
+			{ title: 'Script transactions per day', width: 2, viz: { type: 'stacked' }, sql: `SELECT date, txs - failed_txs AS ok, failed_txs AS failed\nFROM {script_daily}\nWHERE script_hash = {$script} AND date > {tip_date} - 180\nORDER BY date` },
+			{ title: 'Fees paid per day', width: 1, viz: { type: 'line', format: 'ada' }, sql: `SELECT date, fees_ada\nFROM {script_daily}\nWHERE script_hash = {$script} AND date > {tip_date} - 180\nORDER BY date` }
 		]
 	}
 ];

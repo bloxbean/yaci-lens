@@ -10,13 +10,19 @@
 	import { assetsOf, lovelaceOf, type Utxo } from './types';
 	import { hover } from './hover.svelte';
 
-	/* One input or output: address, value, assets, and markers for datums and reference scripts. */
+	/*
+	 * One input or output: address, value, assets, and markers for datums and reference scripts. With indexed
+	 * lookups: `spentBy` (outputs: the spending transaction, null = unspent at the tip, undefined = not known) and
+	 * `linkAddress` (the address opens its wallet view).
+	 */
 	let {
 		utxo,
 		side,
 		tag = undefined,
-		ondatum = undefined
-	}: { utxo: Utxo; side: 'in' | 'out'; tag?: string; ondatum?: (u: Utxo) => void } = $props();
+		ondatum = undefined,
+		spentBy = undefined,
+		linkAddress = false
+	}: { utxo: Utxo; side: 'in' | 'out'; tag?: string; ondatum?: (u: Utxo) => void; spentBy?: string | null; linkAddress?: boolean } = $props();
 
 	const assets = $derived(assetsOf(utxo.amount));
 	const lit = $derived(hover.address === utxo.address);
@@ -33,7 +39,8 @@
 	<div class="flex items-start justify-between gap-2">
 		<div class="min-w-0">
 			<div class="flex items-center gap-1.5">
-				<span class="mono truncate text-[13px] font-medium text-ink" title={utxo.address}>{shorten(utxo.address, 14, 8)}</span>
+				{#if linkAddress}<a class="mono truncate text-[13px] font-medium text-ink hover:text-brand" title="{utxo.address} · open its activity" href="#/x/address/{utxo.address}">{shorten(utxo.address, 14, 8)}</a>
+				{:else}<span class="mono truncate text-[13px] font-medium text-ink" title={utxo.address}>{shorten(utxo.address, 14, 8)}</span>{/if}
 				<CopyButton value={utxo.address} size="xs" label="Address copied" />
 			</div>
 			<div class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -50,6 +57,12 @@
 				<a href="#/transactions/{utxo.tx_hash}" class="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-faint hover:text-brand" title="Spent output {utxo.tx_hash}#{utxo.output_index}">
 					<CornerDownRight class="h-3 w-3" />{shorten(utxo.tx_hash, 6, 4)}#{utxo.output_index}
 				</a>
+			{:else if spentBy}
+				<a href="#/transactions/{spentBy}" class="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-faint hover:text-brand" title="#{utxo.output_index} was spent by {spentBy}" data-testid="spent-by-link">
+					#{utxo.output_index} · spent by {shorten(spentBy, 6, 4)} →
+				</a>
+			{:else if spentBy === null}
+				<div class="mt-0.5 text-[11px] text-mint" title="Not spent at the published tip">#{utxo.output_index} · unspent</div>
 			{:else}
 				<div class="mt-0.5 text-[11px] text-faint">#{utxo.output_index}</div>
 			{/if}
