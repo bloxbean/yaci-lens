@@ -144,8 +144,6 @@
 			</div>
 		</section>
 
-		{#if indexed}<HoldersPanel {unit} {decimals} />{/if}
-
 		<section class="mb-6 grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
 			<Panel title="Policy activity" sub="Transactions with an output holding this policy's tokens, per day">
 				{#snippet actions()}<RangePicker bind:value={range} options={RANGES.filter((x) => x.days != null)} />{/snippet}
@@ -177,6 +175,8 @@
 				{/if}
 			</Panel>
 		</section>
+
+		{#if indexed}<HoldersPanel {unit} {decimals} />{/if}
 
 		{#if meta}
 			<Panel title="Mint metadata (CIP-25)" sub="Label 721 of the transaction that first minted it" class="mb-6">
